@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Production-cutover launcher: requires OMNIS_WING_PRODUCTION_CONFIG; never defaults to test signer.
+set -euo pipefail
+ROOT="/Users/sokpyeon/projects/omnis-wing"
+if [[ -z "${OMNIS_WING_PRODUCTION_CONFIG:-}" ]]; then
+  echo "Set OMNIS_WING_PRODUCTION_CONFIG to an explicit YAML/JSON config." >&2
+  echo "Example: $ROOT/omnis_wing/config/production.example.yaml" >&2
+  exit 2
+fi
+export OMNIS_WING_SIGNER_MODE=production
+exec "$ROOT/scripts/hermes-wing" "$@"

@@ -1764,6 +1764,27 @@ def init_agent(
             "is_anthropic_oauth": agent._is_anthropic_oauth,
         })
 
+    # OMNIS WING production-cutover: attach signer/ledger (never enrolls)
+    try:
+        from omnis_wing.absolute.runtime_attach import ensure_agent_production_runtime
+        ensure_agent_production_runtime(agent)
+    except Exception:
+        try:
+            from omnis_wing.absolute.receipt_spine import UnavailableSigner, EvidenceLedger
+            from omnis_wing.absolute.hermes_chat_join import EvidenceSession
+            from pathlib import Path as _P
+            import tempfile as _tf
+            if not getattr(agent, "wing_production_signer", None):
+                agent.wing_production_signer = UnavailableSigner()
+                lp = _P(_tf.gettempdir()) / "wing-attach-fail-ledger.jsonl"
+                agent.wing_ledger_path = str(lp)
+                agent.wing_evidence_session = EvidenceSession(
+                    signer=agent.wing_production_signer,
+                    ledger=EvidenceLedger(lp),
+                )
+        except Exception:
+            pass
+
 
 
 __all__ = ["init_agent"]

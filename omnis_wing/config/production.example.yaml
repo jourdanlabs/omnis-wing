@@ -1,0 +1,14 @@
+# OMNIS WING production signer config (operator-controlled).
+# Copy and set OMNIS_WING_PRODUCTION_CONFIG=/path/to/this/file
+# Startup NEVER enrolls. Operator must run enroll explicitly first.
+
+backend: keychain
+tag: ai.jourdanlabs.omnis-wing.terminus.r4
+# Ledger directory for signed pre-send / terminal receipts
+ledger_dir: ~/.omnis-wing/ledgers/production
+# Optional absolute path to compiled Swift bridge; empty = default .omnis-wing-build/omnis_wing_keychain
+bridge_path: ""
+# Explicit profile label for health/coverage (informational)
+profile: production
+# Must remain false — enrollment is operator CLI only
+auto_enroll: false

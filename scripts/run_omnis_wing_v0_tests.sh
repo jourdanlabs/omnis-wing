@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-export OMNIS_WING_SIGNER_MODE=test
+export OMNIS_WING_SIGNER_MODE="${OMNIS_WING_SIGNER_MODE:-test}"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 if command -v python3.11 >/dev/null 2>&1; then PY=python3.11
 elif command -v python3.12 >/dev/null 2>&1; then PY=python3.12
@@ -17,4 +17,5 @@ exec "$PY" -m unittest \
   tests.omnis_wing.test_completion_routes \
   tests.omnis_wing.test_completion_disabled \
   tests.omnis_wing.test_completion_p0_repair \
+  tests.omnis_wing.test_production_cutover \
   -v

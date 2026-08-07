@@ -105,6 +105,7 @@ def build_health_report(
         "signer": {
             "key_id": key_id,
             "public_key_sha256": fp,
+            "signature_algorithm": getattr(signer, "signature_algorithm", None) if signer else None,
         },
         "ledger": {
             "signed_receipt_count": signed_count,

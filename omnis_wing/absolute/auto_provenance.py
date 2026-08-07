@@ -78,6 +78,9 @@ def resolve_evidence_session(agent=None) -> EvidenceSession:
     ensure_side_doors_armed()
 
     if agent is not None:
+        from omnis_wing.absolute.runtime_attach import ensure_agent_production_runtime
+
+        ensure_agent_production_runtime(agent)
         existing = getattr(agent, "wing_evidence_session", None)
         if existing is not None:
             return existing

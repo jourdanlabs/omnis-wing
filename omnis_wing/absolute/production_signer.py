@@ -212,6 +212,7 @@ class DisposableP256Backend:
         priv, _pub, raw = generate_keypair_pem(self.work_dir)
         self._priv = priv
         self._raw_pub = raw
+        (self.work_dir / "p256-pub.raw").write_bytes(raw)
         self.enrolled = True
         return self.status()
 

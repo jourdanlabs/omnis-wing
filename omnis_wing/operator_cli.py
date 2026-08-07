@@ -123,7 +123,19 @@ def main(argv: list[str] | None = None) -> int:
     adapter = _backend(args)
 
     if args.cmd == "status":
-        print(json.dumps(adapter.enrollment_status(), sort_keys=True, indent=2))
+        st = adapter.enrollment_status()
+        out = {
+            "enrollment": st,
+            "signature_algorithm": adapter.signature_algorithm,
+            "key_id": adapter.key_id,
+            "available": adapter.available(),
+        }
+        if adapter.available():
+            try:
+                out["public_key_sha256"] = adapter.public_fingerprint()
+            except Exception as exc:
+                out["public_key_error"] = type(exc).__name__
+        print(json.dumps(out, sort_keys=True, indent=2))
         return 0
 
     if args.cmd == "enroll":
