@@ -31,6 +31,7 @@ for _name in ("requests", "yaml"):
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.envelope import IntendedDestination, SourceProvenance  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
+    EvidenceSession,
     WingEgressContext,
     WingRefusal,
     canonical_messages_payload_bytes,
@@ -40,12 +41,20 @@ from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
     stable_json_bytes,
 )
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
+from omnis_wing.absolute.receipt_spine import EvidenceLedger, make_test_signer  # noqa: E402
 
 CADMUS_R2 = ROOT / "omnis_wing" / "spec" / "omnis-wing-r2-live-chat-path.cadmus-input.json"
 CADMUS_R2_SHA = "c12e0cb582634fca8a5bec1f5468c50cb82cf80b9661287a602acfb96d7396dd"
 
 US_BASE = "https://ai.example.test/v1"
 CN_BASE = "https://api.moonshot.cn/v1"
+
+def _evidence(tmp: Path | None = None) -> EvidenceSession:
+    root = Path(tempfile.mkdtemp(prefix="wing-ev-")) if tmp is None else tmp
+    return EvidenceSession(
+        signer=make_test_signer(),
+        ledger=EvidenceLedger(root / "ledger.jsonl"),
+    )
 
 
 def _sha_file(path: Path) -> str:
@@ -160,9 +169,16 @@ def _api_kwargs(messages=None, **extra):
 
 def _ctx(classification: str = "generic", **kw) -> WingEgressContext:
     payload = json.dumps(MESSAGES, ensure_ascii=False, separators=(",", ":"))
+    # Drop non-SourceProvenance kwargs before _src
+    declared = kw.pop("declared_destination", None)
+    evidence = kw.pop("evidence", None)
+    if evidence is None:
+        evidence = _evidence()
+    src_kwargs = {k: v for k, v in kw.items() if k in ("path", "content_digest", "protected_root")}
     return WingEgressContext(
-        sources=(_src(classification, payload, protected_root=(classification != "generic"), **kw),),
-        declared_destination=kw.get("declared_destination"),
+        sources=(_src(classification, payload, protected_root=(classification != "generic"), **src_kwargs),),
+        declared_destination=declared,
+        evidence=evidence,
     )
 
 
@@ -182,16 +198,22 @@ class WingR2ChatPathTests(unittest.TestCase):
         self.assertEqual(client.create_calls, 0)
 
     def test_02_real_path_missing_provenance_refuse_zero_calls(self):
+        # No context at all → R3 fail-closed signer gate first
         client = FakeClient(base_url=US_BASE)
         with self.assertRaises(WingRefusal) as cm:
             interruptible_api_call(MiniAgent(None, client), _api_kwargs())
-        self.assertEqual(cm.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_POLICY_INVALID")
         self.assertEqual(client.create_calls, 0)
 
+        # Evidence present but empty sources → REFUSE_SOURCE_POLICY
         client2 = FakeClient(base_url=US_BASE)
         with self.assertRaises(WingRefusal) as cm2:
             interruptible_api_call(
-                MiniAgent(WingEgressContext(sources=()), client2), _api_kwargs()
+                MiniAgent(
+                    WingEgressContext(sources=(), evidence=_evidence()),
+                    client2,
+                ),
+                _api_kwargs(),
             )
         self.assertEqual(cm2.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
         self.assertEqual(client2.create_calls, 0)
@@ -297,6 +319,7 @@ class WingR2ChatPathTests(unittest.TestCase):
         ctx = WingEgressContext(
             sources=_ctx("generic").sources,
             declared_destination=claimed_us,
+            evidence=_evidence(),
         )
         client = FakeClient(base_url=CN_BASE)
         with self.assertRaises(WingRefusal) as cm:

@@ -84,7 +84,7 @@ def r1_governed_paths(repo_root: Path) -> List[Path]:
     man_path = repo_root / "omnis_wing" / "coverage" / "ai_egress_coverage_r1.json"
     data = json.loads(man_path.read_text(encoding="utf-8"))
     paths = [repo_root / e["path"] for e in data.get("governed_r1", [])]
-    for e in data.get("governed_r2", []):
+    for e in list(data.get("governed_r2", [])) + list(data.get("governed_r3", [])):
         rel = e["path"]
         if not rel.startswith("omnis_wing/"):
             continue  # host join file: coverage-claimed, not import-clean

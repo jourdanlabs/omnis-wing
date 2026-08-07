@@ -1,38 +1,30 @@
-# BUILD_HANDOFF — OMNIS WING R2.1 ABSOLUTE P0 repair
+# BUILD_HANDOFF — OMNIS WING R3: evidence spine
 
 **Final status: `READY_FOR_GATE`**
 
 Builder: Videl  
 Date: 2026-08-07  
 Repo: `~/projects/omnis-wing`  
-Prior R2 head: `b6df780f1734e919cedb54e45a493ec3765431f6`  
-HEAD at handoff: *(gate: `git rev-parse HEAD`)*
+Base: `2ede5a1b25fbc2763041cf1347a3f7b49cf98676` (R2.1)  
+HEAD: *(gate: `git rev-parse HEAD`)*
 
-## R2.1 statement
+## CADMUS
 
-Closed Bulma P0-A and P0-B on the selected non-stream `chat_completions` join only.
-
-| P0 | Repair |
+| Field | Value |
 |---|---|
-| **A** unscanned body fields | Envelope payload = deterministic canonical JSON of **entire** allowlisted provider request body. Broker reconstructs `create(**body)` from evaluated bytes only. Unknown fields → `REFUSE_UNSUPPORTED`. Secrets in `tools` / `extra_body` → `REFUSE_SECRET`, client 0. |
-| **B** declared route bless | Destination derived from **actual** `client.base_url` + controlled `HOSTNAME_POLICY` (provider/residency). Optional `declared_destination` must match derived or `REFUSE_DESTINATION`. Claimed US + `api.moonshot.cn` → refuse, client 0. |
+| Path | `omnis_wing/spec/omnis-wing-r3-evidence-spine.cadmus-input.json` |
+| SHA-256 | `6f7563d2bfe9f3dc752c5d395ed153a6fb944332ad5f56ae84bc64a4af202f23` |
 
-R2 CADMUS SHA **unchanged** (scope not expanded):  
-`c12e0cb582634fca8a5bec1f5468c50cb82cf80b9661287a602acfb96d7396dd`
+## What R3 adds
 
----
+Fail-closed cryptographic evidence on the **already governed R2.1** non-stream chat path:
 
-## Selected call chain (unchanged entry)
-
-```text
-interruptible_api_call → governed_chat_completions_create
-  → canonical_provider_request_body(api_kwargs)  # ALL body fields
-  → derive_destination_from_client(client.base_url)
-  → OutboundEnvelope → dispatch_outbound
-  → broker: create(**json.loads(envelope.payload_bytes))
-```
-
----
+1. **Signer abstraction** — `Signer` protocol; `Ed25519TestSigner` (pure-Python Ed25519, test-only); `UnavailableSigner`.
+2. **Missing signer** → `REFUSE_POLICY_INVALID` **before** broker/client call (fake client 0).
+3. **Signed secret-free receipt** — envelope digest, decision, phase, policy/coverage, actual destination/provider/residency, findings correlation digest (IDs only), previous digest, sequence, key_id, receipt_digest, Ed25519 signature.
+4. **Append-only ledger** — JSONL with sequence + previous-digest + signature verification.
+5. **External anchor fixture** — binds chain head; whole-ledger replacement fails anchor verify.
+6. **Integrated** into `governed_chat_completions_create` via `WingEgressContext.evidence` (`EvidenceSession`).
 
 ## Cold proof
 
@@ -41,36 +33,37 @@ cd ~/projects/omnis-wing
 ./scripts/run_omnis_wing_v0_tests.sh
 ```
 
-Builder: **32/32 OK** (W0 + R1.1 + R2 + R2.1 P0 controls).
+Builder: **39/39 OK**.
 
-| Control | Observed |
+| Can-fail | Observed |
 |---|---|
-| protected + actual CN base_url | `REFUSE_RESIDENCY`, client 0 |
-| missing provenance | `REFUSE_SOURCE_POLICY`, client 0 |
-| generic + US base_url | client 1; **full body** bytes equal |
-| secret in `tools` | `REFUSE_SECRET`, client 0, no cleartext/bare-sha leak |
-| secret in `extra_body` | `REFUSE_SECRET`, client 0, no leak |
-| unknown body field | `REFUSE_UNSUPPORTED`, client 0 |
-| claimed US dest + moonshot.cn base_url | `REFUSE_DESTINATION`, client 0 |
-| R1.1 regression | green |
+| One-byte receipt/sig mutation | `verify_signed_receipt` false |
+| Ledger replaced with fresh chain | `verify_anchor` → `anchor_head_mismatch` |
+| Signer unavailable | `REFUSE_POLICY_INVALID`, client 0 |
+| Planted secret | absent from exception, receipt, ledger, anchor; no bare SHA-256 marker |
+| Protected CN + generic permit | still green **with signed evidence** on selected path |
+| R1.1 / R2.1 regression | green |
 
----
+## Files
 
-## Files touched (R2.1 delta)
+| Path | Role |
+|---|---|
+| `omnis_wing/absolute/ed25519_pure.py` | Offline Ed25519 |
+| `omnis_wing/absolute/receipt_spine.py` | Sign / ledger / anchor |
+| `omnis_wing/absolute/hermes_chat_join.py` | Evidence session + fail-closed signer gate |
+| `tests/omnis_wing/test_r3_evidence_spine.py` | R3 can-fails |
+| `omnis_wing/spec/omnis-wing-r3-evidence-spine.cadmus-input.json` | Authority |
+| coverage / runner / BUILD_HANDOFF | honesty + cold command |
 
-- `omnis_wing/absolute/hermes_chat_join.py` — full-body canon + endpoint bind  
-- `omnis_wing/absolute/evaluator.py` — `REFUSE_UNSUPPORTED` in Decision  
-- `tests/omnis_wing/test_r2_chat_path.py` — P0-A/B controls  
-- `omnis_wing/coverage/ai_egress_coverage_r1.json` — R2.1 notes  
-- `BUILD_HANDOFF.md` — this document  
+Live Hermes / Keychain / network: **not touched**.
 
-Live Hermes: **untouched**.
+## Non-claims
 
----
-
-## Non-claims (unchanged, blunt)
-
-Not streaming / Anthropic / Bedrock / Codex paths. Not whole-tree egress. Not signing/chain. Not live wiring/providers. Not package/push. Not full ABSOLUTE certification. HTTP/TLS/auth headers still outside body equality claim.
+- Not production Keychain / Secure Enclave enrollment.  
+- Not retro-signing legacy rows; not “whole product ledger globally signed.”  
+- Not streaming / other provider paths / full ABSOLUTE cert.  
+- Not live Videl wiring, real providers, package, push.  
+- Pure-Python Ed25519 is **test/offline spine**, not an HSM claim.
 
 **READY_FOR_GATE**
 

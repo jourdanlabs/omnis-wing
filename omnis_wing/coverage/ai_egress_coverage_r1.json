@@ -6,7 +6,7 @@
   "claims_absolute_complete": false,
   "claims_all_hermes_chat_paths": false,
   "glass": {
-    "active_boundary": "AI EGRESS GOVERNED (R1 seam + R2.1 full-body chat_completions join + actual endpoint bind)",
+    "active_boundary": "AI EGRESS GOVERNED (R2.1 join + R3 evidence spine on that path)",
     "also_true": [
       "IDE-OWNED EGRESS GOVERNED \u2014 not claimed",
       "WORKSTATION EGRESS NOT GOVERNED",
@@ -113,5 +113,17 @@
       "retries/fallbacks as separate paths",
       "whole Hermes tree"
     ]
-  }
+  },
+  "governed_r3": [
+    {
+      "path": "omnis_wing/absolute/receipt_spine.py",
+      "status": "governed_r3",
+      "role": "signed receipts + ledger + anchor"
+    },
+    {
+      "path": "omnis_wing/absolute/ed25519_pure.py",
+      "status": "governed_r3",
+      "role": "test-only pure Ed25519 backend"
+    }
+  ]
 }

@@ -36,6 +36,14 @@ from omnis_wing.absolute.evaluator import (
     TransmissionReceipt,
 )
 from omnis_wing.absolute.host import dispatch_outbound
+from omnis_wing.absolute.receipt_spine import (
+    EvidenceLedger,
+    Signer,
+    SignerUnavailable,
+    UnavailableSigner,
+    build_signed_receipt,
+    make_test_signer,
+)
 
 R2_COVERAGE_CLASS = "AI_EGRESS_GOVERNED_R2_CHAT_COMPLETIONS_JOIN"
 R2_LANE = "hermes.chat_completions.non_stream"
@@ -82,11 +90,21 @@ HOSTNAME_POLICY: dict[str, tuple[str, str]] = {
 
 
 class WingRefusal(Exception):
-    def __init__(self, receipt: TransmissionReceipt):
+    def __init__(self, receipt: TransmissionReceipt, signed=None):
         self.receipt = receipt
+        self.signed = signed
         super().__init__(
             f"WING {receipt.decision} phase={receipt.phase}: {receipt.reason}"
         )
+
+
+@dataclass
+class EvidenceSession:
+    """R3 evidence spine handles for the selected path (test-only signer OK)."""
+
+    signer: object  # Signer protocol
+    ledger: EvidenceLedger
+    last_signed: object | None = None
 
 
 @dataclass
@@ -95,6 +113,9 @@ class WingEgressContext:
 
     Destination is NOT authoritative. Optional declared_destination, if present,
     must exactly match the destination derived from the actual client endpoint.
+
+    evidence: R3 spine session; missing/unavailable signer → REFUSE_POLICY_INVALID
+    before broker call.
     """
 
     sources: tuple[SourceProvenance, ...]
@@ -102,8 +123,8 @@ class WingEgressContext:
     lane: str = R2_LANE
     policy_version: str = R2_POLICY_VERSION
     coverage_class: str = R2_COVERAGE_CLASS
+    evidence: Optional[EvidenceSession] = None
 
-    # Back-compat alias used by older R2 tests/callers — treated as declared only.
     @property
     def destination(self) -> Optional[IntendedDestination]:
         return self.declared_destination
@@ -347,6 +368,32 @@ def build_envelope_for_chat(
     return env, None
 
 
+def _resolve_evidence(wing_ctx: Optional[WingEgressContext]) -> Optional[EvidenceSession]:
+    if wing_ctx is None:
+        return None
+    return wing_ctx.evidence
+
+
+def _sign_and_ledger(
+    tr: TransmissionReceipt,
+    evidence: Optional[EvidenceSession],
+) -> object | None:
+    """Create signed receipt and append ledger when evidence session present."""
+    if evidence is None:
+        return None
+    signer = evidence.signer
+    ledger = evidence.ledger
+    signed = build_signed_receipt(
+        tr,
+        signer=signer,
+        previous_digest=ledger.head_digest(),
+        sequence=ledger.next_sequence(),
+    )
+    ledger.append(signed)
+    evidence.last_signed = signed
+    return signed
+
+
 def governed_chat_completions_create(
     client: Any,
     api_kwargs: dict,
@@ -354,19 +401,32 @@ def governed_chat_completions_create(
     *,
     broker: Optional[ChatCompletionsClientBroker] = None,
 ) -> Any:
-    """Sole outbound join for selected non-streaming chat_completions path."""
+    """Sole outbound join for selected non-streaming chat_completions path.
+
+    R3: evidence.signer must be available before any broker/client call.
+    """
+    evidence = _resolve_evidence(wing_ctx)
+    # Fail-closed signer gate (before envelope broker / client)
+    if evidence is None or evidence.signer is None or not evidence.signer.available():
+        early = _refusal_receipt(
+            decision="REFUSE_POLICY_INVALID",
+            reason="signer_unavailable",
+        )
+        raise WingRefusal(early)
+
     envelope, early = build_envelope_for_chat(api_kwargs, wing_ctx, client)
     if early is not None:
-        raise WingRefusal(early)
+        signed = _sign_and_ledger(early, evidence)
+        raise WingRefusal(early, signed=signed)
     assert envelope is not None
 
     br = broker or ChatCompletionsClientBroker(client)
     receipt = dispatch_outbound(envelope, br)
+    signed = _sign_and_ledger(receipt, evidence)
     if receipt.decision != "PERMIT" or receipt.phase != "TRANSMISSION_COMPLETED":
-        raise WingRefusal(receipt)
+        raise WingRefusal(receipt, signed=signed)
     if br.last_payload != envelope.payload_bytes:
         raise RuntimeError("delivered_payload_bytes_mismatch")
-    # Complete-request equality: client kwargs must match evaluated body
     if br.delivered_kwargs is not None:
         rebuilt = stable_json_bytes(br.delivered_kwargs)
         if rebuilt != envelope.payload_bytes:
