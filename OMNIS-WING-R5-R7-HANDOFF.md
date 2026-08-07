@@ -10,7 +10,7 @@
 | Item | Value |
 |---|---|
 | Branch | `omnis-wing/v0-admission` |
-| **R5–R7 tip** | *(git rev-parse HEAD at commit)* |
+| **R5–R7 tip** | b5a668f52c3c6462204560d2262f937768cc3b12 |
 | Prior base | `acce399e12130b09be31728ad452148630b7c47e` |
 | Live Hermes | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` **untouched** |
 | CADMUS R5–R7 | `omnis_wing/spec/omnis-wing-r5-r7-terminus-convergence.cadmus-input.json` |
