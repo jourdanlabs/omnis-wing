@@ -23,6 +23,11 @@ class SignerUnavailable(Exception):
     """Signing key not available — fail closed."""
 
 
+class EvidencePersistError(Exception):
+    """Sign or ledger append failed — fail closed / outcome unknown."""
+
+
+
 class Signer(Protocol):
     key_id: str
 
@@ -162,7 +167,12 @@ def build_signed_receipt(
     unsigned = _stable(body)
     receipt_digest = sha256(unsigned).hexdigest()
     # Sign the receipt digest bytes (hex utf-8) for stable length
-    sig = signer.sign(receipt_digest.encode("ascii"))
+    try:
+        sig = signer.sign(receipt_digest.encode("ascii"))
+    except SignerUnavailable:
+        raise
+    except Exception as exc:
+        raise EvidencePersistError(f"sign_failed:{type(exc).__name__}") from exc
     return SignedEvidenceReceipt(
         schema=body["schema"],
         envelope_digest=body["envelope_digest"],
@@ -247,7 +257,20 @@ class EvidenceLedger:
     def next_sequence(self) -> int:
         return len(self.load_entries()) + 1
 
+    def ensure_appendable(self) -> None:
+        """Fail before send if ledger cannot be written."""
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as f:
+                f.flush()
+        except OSError as exc:
+            raise EvidencePersistError(f"ledger_not_appendable:{exc}") from exc
+        if getattr(self, "_force_unappendable", False):
+            raise EvidencePersistError("ledger_not_appendable:forced")
+
     def append(self, receipt: SignedEvidenceReceipt) -> None:
+        if getattr(self, "_force_unappendable", False):
+            raise EvidencePersistError("ledger_not_appendable:forced")
         entries = self.load_entries()
         prev = GENESIS_PREV if not entries else entries[-1]["receipt_digest"]
         seq = len(entries) + 1
@@ -255,8 +278,12 @@ class EvidenceLedger:
             raise ValueError("previous_digest chain break on append")
         if receipt.sequence != seq:
             raise ValueError("sequence break on append")
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(receipt.serialize() + "\n")
+        try:
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(receipt.serialize() + "\n")
+                f.flush()
+        except OSError as exc:
+            raise EvidencePersistError(f"ledger_append_failed:{exc}") from exc
 
     def verify_chain(self, public_key: bytes) -> tuple[bool, str]:
         entries = self.load_entries()
@@ -314,3 +341,42 @@ def make_test_signer(seed: Optional[bytes] = None) -> Ed25519TestSigner:
             "35e8f67854259b85950d9f88e71b8f912892339eac961dd8dd9c584365513e1d"
         )
     return Ed25519TestSigner(seed=seed)
+
+
+def ledger_outcome_report(ledger: EvidenceLedger) -> dict:
+    """Truthful report of chain terminal completeness (no flattering SENT)."""
+    entries = ledger.load_entries()
+    if not entries:
+        return {"status": "empty", "terminal_missing": True}
+    last = entries[-1]
+    phase = last.get("phase")
+    if phase == "TRANSMISSION_STARTED":
+        return {
+            "status": "OUTCOME_UNKNOWN",
+            "terminal_missing": True,
+            "last_phase": phase,
+            "last_receipt_digest": last.get("receipt_digest"),
+            "sequence": last.get("sequence"),
+        }
+    if phase == "TRANSMISSION_COMPLETED":
+        return {
+            "status": "terminal_complete",
+            "terminal_missing": False,
+            "last_phase": phase,
+            "last_receipt_digest": last.get("receipt_digest"),
+            "sequence": last.get("sequence"),
+        }
+    if phase in ("NONE",) or str(last.get("decision", "")).startswith("REFUSE"):
+        return {
+            "status": "refusal_recorded",
+            "terminal_missing": False,
+            "last_phase": phase,
+            "decision": last.get("decision"),
+            "last_receipt_digest": last.get("receipt_digest"),
+        }
+    return {
+        "status": "OUTCOME_UNKNOWN",
+        "terminal_missing": True,
+        "last_phase": phase,
+        "last_receipt_digest": last.get("receipt_digest"),
+    }

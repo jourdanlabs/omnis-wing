@@ -31,6 +31,7 @@ from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.envelope import SourceProvenance  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
     EvidenceSession,
+    OutcomeUnknownError,
     WingEgressContext,
     WingRefusal,
     governed_chat_completions_create,
@@ -38,6 +39,7 @@ from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
 from omnis_wing.absolute.receipt_spine import (  # noqa: E402
     EvidenceLedger,
     UnavailableSigner,
+    ledger_outcome_report,
     make_test_signer,
     verify_anchor,
     verify_signed_receipt,
@@ -161,9 +163,14 @@ class R3EvidenceTests(unittest.TestCase):
         self.assertTrue(verify_signed_receipt(ev.last_signed, pk))
         ok, reason = ev.ledger.verify_chain(pk)
         self.assertTrue(ok, reason)
+        entries = ev.ledger.load_entries()
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0]["phase"], "TRANSMISSION_STARTED")
+        self.assertEqual(entries[1]["phase"], "TRANSMISSION_COMPLETED")
         self.assertEqual(ev.last_signed.decision, "PERMIT")
         self.assertEqual(ev.last_signed.phase, "TRANSMISSION_COMPLETED")
         self.assertEqual(ev.last_signed.residency, "US")
+        self.assertEqual(ledger_outcome_report(ev.ledger)["status"], "terminal_complete")
 
     def test_02_protected_cn_signed_refusal_client_0(self):
         ev = _session(self.td)
@@ -262,6 +269,152 @@ class R3EvidenceTests(unittest.TestCase):
         for b in blobs:
             self.assertNotIn(secret, b)
             self.assertNotIn(bare, b)
+
+
+
+    # ── R3.1 P0-A ────────────────────────────────────────────────────────
+
+    def test_07_noncanonical_S_plus_L_fails_verify(self):
+        """Valid sig with S replaced by S+L must not verify (RFC 8032)."""
+        signer = make_test_signer()
+        msg = b"omnis-wing-r3-canonical-scalar"
+        sig = signer.sign(msg)
+        self.assertTrue(signer.verify(msg, sig))
+        from omnis_wing.absolute.ed25519_pure import l as L
+
+        S = int.from_bytes(sig[32:], "little")
+        mutated = sig[:32] + (S + L).to_bytes(32, "little")
+        self.assertNotEqual(sig, mutated)
+        self.assertTrue(signer.verify(msg, sig))
+        self.assertFalse(signer.verify(msg, mutated))
+        # Also via receipt path
+        ev = _session(self.td)
+        ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
+        governed_chat_completions_create(FakeClient(US_BASE), _api_kwargs(), ctx)
+        d = ev.last_signed.to_dict()
+        hx = d["signature_hex"]
+        raw = bytes.fromhex(hx)
+        S2 = int.from_bytes(raw[32:], "little")
+        mut2 = raw[:32] + (S2 + L).to_bytes(32, "little")
+        d["signature_hex"] = mut2.hex()
+        self.assertFalse(verify_signed_receipt(d, signer.public_key_bytes()))
+
+    # ── R3.1 P0-B ────────────────────────────────────────────────────────
+
+    def test_08_sign_raises_before_send_client_0(self):
+        class BoomSigner:
+            key_id = "boom"
+
+            def available(self):
+                return True
+
+            def public_key_bytes(self):
+                return make_test_signer().public_key_bytes()
+
+            def sign(self, message: bytes) -> bytes:
+                raise RuntimeError("signer backend exploded")
+
+        ev = EvidenceSession(
+            signer=BoomSigner(),
+            ledger=EvidenceLedger(self.td / "ledger.jsonl"),
+        )
+        ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
+        client = FakeClient(US_BASE)
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(MiniAgent(ctx, client), _api_kwargs())
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_POLICY_INVALID")
+        self.assertIn("pre_send_evidence_failed", cm.exception.receipt.reason)
+        self.assertEqual(client.create_calls, 0)
+        self.assertEqual(ev.ledger.path.read_bytes(), b"")
+
+    def test_09_ledger_not_appendable_before_send_client_0(self):
+        ledger = EvidenceLedger(self.td / "ledger.jsonl")
+        ledger._force_unappendable = True  # type: ignore[attr-defined]
+        ev = EvidenceSession(signer=make_test_signer(), ledger=ledger)
+        ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
+        client = FakeClient(US_BASE)
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(MiniAgent(ctx, client), _api_kwargs())
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_POLICY_INVALID")
+        self.assertEqual(client.create_calls, 0)
+
+    def test_10_terminal_sign_fail_after_provider_outcome_unknown(self):
+        class FailTerminalSigner:
+            def __init__(self):
+                self.inner = make_test_signer()
+                self.key_id = self.inner.key_id
+                self.n = 0
+
+            def available(self):
+                return True
+
+            def public_key_bytes(self):
+                return self.inner.public_key_bytes()
+
+            def sign(self, message: bytes) -> bytes:
+                self.n += 1
+                if self.n >= 2:
+                    raise RuntimeError("terminal sign fail")
+                return self.inner.sign(message)
+
+        signer = FailTerminalSigner()
+        ev = EvidenceSession(
+            signer=signer,
+            ledger=EvidenceLedger(self.td / "ledger.jsonl"),
+        )
+        ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
+        client = FakeClient(US_BASE)
+        with self.assertRaises(OutcomeUnknownError) as cm:
+            interruptible_api_call(MiniAgent(ctx, client), _api_kwargs())
+        self.assertEqual(cm.exception.client_calls, 1)
+        self.assertEqual(client.create_calls, 1)
+        self.assertIsNotNone(cm.exception.pre_send_signed)
+        self.assertEqual(cm.exception.pre_send_signed.phase, "TRANSMISSION_STARTED")
+        self.assertTrue(
+            verify_signed_receipt(
+                cm.exception.pre_send_signed, signer.public_key_bytes()
+            )
+        )
+        # Durable start only — no COMPLETED terminal success
+        entries = ev.ledger.load_entries()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["phase"], "TRANSMISSION_STARTED")
+        report = ledger_outcome_report(ev.ledger)
+        self.assertEqual(report["status"], "OUTCOME_UNKNOWN")
+        self.assertTrue(report["terminal_missing"])
+        # Caller must not treat as normal success (exception raised)
+
+    def test_11_p0b_evidence_hygiene_no_secret(self):
+        secret = PLANTED_SECRET_MARKERS[0]
+        class BoomSigner:
+            key_id = "boom"
+            def available(self):
+                return True
+            def public_key_bytes(self):
+                return make_test_signer().public_key_bytes()
+            def sign(self, message: bytes) -> bytes:
+                raise RuntimeError("signer backend exploded")
+        ev = EvidenceSession(
+            signer=BoomSigner(),
+            ledger=EvidenceLedger(self.td / "ledger.jsonl"),
+        )
+        ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
+        client = FakeClient(US_BASE)
+        # even with secret in body, refuse path must not leak
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(
+                MiniAgent(ctx, client),
+                _api_kwargs(extra_body={"note": secret}),
+            )
+        # may be REFUSE_SECRET if eval happens before pre-send... 
+        # Order: ensure ledger, build envelope, evaluate (secret → REFUSE_SECRET), try sign refuse
+        # BoomSigner will fail signing refuse → signed=None, still WingRefusal REFUSE_SECRET
+        self.assertEqual(client.create_calls, 0)
+        blob = str(cm.exception) + cm.exception.receipt.serialize_for_hygiene()
+        bare = hashlib.sha256(secret.encode()).hexdigest()
+        self.assertNotIn(secret, blob)
+        self.assertNotIn(bare, blob)
+
 
 
 if __name__ == "__main__":

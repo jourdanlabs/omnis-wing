@@ -36,12 +36,15 @@ from omnis_wing.absolute.evaluator import (
     TransmissionReceipt,
 )
 from omnis_wing.absolute.host import dispatch_outbound
+from omnis_wing.absolute.evaluator import evaluate_decision
 from omnis_wing.absolute.receipt_spine import (
     EvidenceLedger,
+    EvidencePersistError,
     Signer,
     SignerUnavailable,
     UnavailableSigner,
     build_signed_receipt,
+    ledger_outcome_report,
     make_test_signer,
 )
 
@@ -96,6 +99,29 @@ class WingRefusal(Exception):
         super().__init__(
             f"WING {receipt.decision} phase={receipt.phase}: {receipt.reason}"
         )
+
+
+class OutcomeUnknownError(Exception):
+    """Provider may have been called; terminal signed evidence missing/failed.
+
+    Not a normal success. Pre-send signed record must remain verifiable.
+    """
+
+    def __init__(
+        self,
+        *,
+        receipt: TransmissionReceipt,
+        pre_send_signed=None,
+        client_calls: int = 0,
+        response: Any = None,
+        reason: str = "terminal_evidence_failed",
+    ):
+        self.receipt = receipt
+        self.pre_send_signed = pre_send_signed
+        self.client_calls = client_calls
+        self.response = response
+        self.reason = reason
+        super().__init__(f"WING OUTCOME_UNKNOWN client_calls={client_calls}: {reason}")
 
 
 @dataclass
@@ -376,11 +402,9 @@ def _resolve_evidence(wing_ctx: Optional[WingEgressContext]) -> Optional[Evidenc
 
 def _sign_and_ledger(
     tr: TransmissionReceipt,
-    evidence: Optional[EvidenceSession],
-) -> object | None:
-    """Create signed receipt and append ledger when evidence session present."""
-    if evidence is None:
-        return None
+    evidence: EvidenceSession,
+) -> object:
+    """Create signed receipt and append ledger. Raises EvidencePersistError on fail."""
     signer = evidence.signer
     ledger = evidence.ledger
     signed = build_signed_receipt(
@@ -394,6 +418,76 @@ def _sign_and_ledger(
     return signed
 
 
+def _tr_from_auth_pre_send(envelope, authorization) -> TransmissionReceipt:
+    """Durable pre-send record: AUTHORIZED/TRANSMISSION_STARTED, calls=0."""
+    return TransmissionReceipt(
+        envelope_id=envelope.envelope_id,
+        envelope_digest=authorization.envelope_digest,
+        payload_digest=authorization.payload_digest,
+        decision="PERMIT",
+        phase="TRANSMISSION_STARTED",
+        reason="pre_send_authorized",
+        finding_ids=authorization.finding_ids,
+        provider_calls=0,
+        delivered_payload_digest=None,
+        destination=envelope.intended_destination.to_dict(),
+        policy_version=authorization.policy_version,
+        coverage_class=authorization.coverage_class,
+        phases_observed=("AUTHORIZED", "TRANSMISSION_STARTED"),
+    )
+
+
+def _tr_terminal_complete(envelope, authorization, broker) -> TransmissionReceipt:
+    delivered = sha256_hex(broker.last_payload) if broker.last_payload is not None else None
+    return TransmissionReceipt(
+        envelope_id=envelope.envelope_id,
+        envelope_digest=authorization.envelope_digest,
+        payload_digest=authorization.payload_digest,
+        decision="PERMIT",
+        phase="TRANSMISSION_COMPLETED",
+        reason=authorization.reason,
+        finding_ids=authorization.finding_ids,
+        provider_calls=broker.calls,
+        delivered_payload_digest=delivered,
+        destination=envelope.intended_destination.to_dict(),
+        policy_version=authorization.policy_version,
+        coverage_class=authorization.coverage_class,
+        phases_observed=(
+            "AUTHORIZED",
+            "TRANSMISSION_STARTED",
+            "TRANSMISSION_COMPLETED",
+        ),
+    )
+
+
+def _tr_outcome_unknown(envelope, authorization, broker, reason: str) -> TransmissionReceipt:
+    return TransmissionReceipt(
+        envelope_id=envelope.envelope_id,
+        envelope_digest=authorization.envelope_digest,
+        payload_digest=authorization.payload_digest,
+        decision="PERMIT",
+        phase="OUTCOME_UNKNOWN",
+        reason=reason,
+        finding_ids=authorization.finding_ids,
+        provider_calls=broker.calls,
+        delivered_payload_digest=None,
+        destination=envelope.intended_destination.to_dict(),
+        policy_version=authorization.policy_version,
+        coverage_class=authorization.coverage_class,
+        phases_observed=(
+            "AUTHORIZED",
+            "TRANSMISSION_STARTED",
+            "OUTCOME_UNKNOWN",
+        ),
+    )
+
+
+def sha256_hex(data: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()
+
+
 def governed_chat_completions_create(
     client: Any,
     api_kwargs: dict,
@@ -403,10 +497,12 @@ def governed_chat_completions_create(
 ) -> Any:
     """Sole outbound join for selected non-streaming chat_completions path.
 
-    R3: evidence.signer must be available before any broker/client call.
+    R3.1 evidence integrity:
+    - Signer must be available before any client call.
+    - Durable signed pre-send (TRANSMISSION_STARTED) before broker.transmit.
+    - Terminal signed evidence after call; failure → OutcomeUnknownError, not success.
     """
     evidence = _resolve_evidence(wing_ctx)
-    # Fail-closed signer gate (before envelope broker / client)
     if evidence is None or evidence.signer is None or not evidence.signer.available():
         early = _refusal_receipt(
             decision="REFUSE_POLICY_INVALID",
@@ -414,23 +510,141 @@ def governed_chat_completions_create(
         )
         raise WingRefusal(early)
 
+    # Ledger must be appendable before we attempt send
+    try:
+        evidence.ledger.ensure_appendable()
+    except EvidencePersistError as exc:
+        early = _refusal_receipt(
+            decision="REFUSE_POLICY_INVALID",
+            reason=f"ledger_not_appendable:{exc}",
+        )
+        raise WingRefusal(early) from exc
+
     envelope, early = build_envelope_for_chat(api_kwargs, wing_ctx, client)
     if early is not None:
-        signed = _sign_and_ledger(early, evidence)
+        try:
+            signed = _sign_and_ledger(early, evidence)
+        except (EvidencePersistError, SignerUnavailable, Exception):
+            signed = None
         raise WingRefusal(early, signed=signed)
     assert envelope is not None
 
+    # Evaluate ABSOLUTE decision WITHOUT calling the provider
+    authorization = evaluate_decision(envelope)
+    if authorization.decision != "PERMIT":
+        refuse_tr = TransmissionReceipt(
+            envelope_id=envelope.envelope_id,
+            envelope_digest=authorization.envelope_digest,
+            payload_digest=authorization.payload_digest,
+            decision=authorization.decision,
+            phase="NONE",
+            reason=authorization.reason,
+            finding_ids=authorization.finding_ids,
+            provider_calls=0,
+            delivered_payload_digest=None,
+            destination=envelope.intended_destination.to_dict(),
+            policy_version=authorization.policy_version,
+            coverage_class=authorization.coverage_class,
+            phases_observed=(),
+        )
+        try:
+            signed = _sign_and_ledger(refuse_tr, evidence)
+        except (EvidencePersistError, SignerUnavailable, Exception):
+            signed = None
+        raise WingRefusal(refuse_tr, signed=signed)
+
+    # --- Pre-send durable signed evidence (client still 0) ---
+    pre_tr = _tr_from_auth_pre_send(envelope, authorization)
+    try:
+        pre_signed = _sign_and_ledger(pre_tr, evidence)
+    except (EvidencePersistError, SignerUnavailable) as exc:
+        early = _refusal_receipt(
+            decision="REFUSE_POLICY_INVALID",
+            reason=f"pre_send_evidence_failed:{type(exc).__name__}",
+        )
+        raise WingRefusal(early) from exc
+    except Exception as exc:
+        early = _refusal_receipt(
+            decision="REFUSE_POLICY_INVALID",
+            reason=f"pre_send_evidence_failed:{type(exc).__name__}",
+        )
+        raise WingRefusal(early) from exc
+
     br = broker or ChatCompletionsClientBroker(client)
-    receipt = dispatch_outbound(envelope, br)
-    signed = _sign_and_ledger(receipt, evidence)
-    if receipt.decision != "PERMIT" or receipt.phase != "TRANSMISSION_COMPLETED":
-        raise WingRefusal(receipt, signed=signed)
+    try:
+        br.transmit(envelope, authorization)
+    except Exception as exc:
+        # Call may or may not have reached provider; broker.calls is truth
+        unk = _tr_outcome_unknown(
+            envelope, authorization, br, reason=f"transmit_failed:{type(exc).__name__}"
+        )
+        try:
+            _sign_and_ledger(unk, evidence)
+        except Exception:
+            pass
+        raise OutcomeUnknownError(
+            receipt=unk,
+            pre_send_signed=pre_signed,
+            client_calls=br.calls,
+            response=getattr(br, "response", None),
+            reason=unk.reason,
+        ) from exc
+
     if br.last_payload != envelope.payload_bytes:
-        raise RuntimeError("delivered_payload_bytes_mismatch")
+        unk = _tr_outcome_unknown(
+            envelope, authorization, br, reason="delivered_bytes_mismatch"
+        )
+        try:
+            _sign_and_ledger(unk, evidence)
+        except Exception:
+            pass
+        raise OutcomeUnknownError(
+            receipt=unk,
+            pre_send_signed=pre_signed,
+            client_calls=br.calls,
+            response=getattr(br, "response", None),
+            reason="delivered_bytes_mismatch",
+        )
+
     if br.delivered_kwargs is not None:
         rebuilt = stable_json_bytes(br.delivered_kwargs)
         if rebuilt != envelope.payload_bytes:
-            raise RuntimeError("delivered_body_canonical_mismatch")
+            unk = _tr_outcome_unknown(
+                envelope, authorization, br, reason="delivered_body_canonical_mismatch"
+            )
+            try:
+                _sign_and_ledger(unk, evidence)
+            except Exception:
+                pass
+            raise OutcomeUnknownError(
+                receipt=unk,
+                pre_send_signed=pre_signed,
+                client_calls=br.calls,
+                response=getattr(br, "response", None),
+                reason="delivered_body_canonical_mismatch",
+            )
+
+    # --- Terminal evidence ---
+    term_tr = _tr_terminal_complete(envelope, authorization, br)
+    try:
+        _sign_and_ledger(term_tr, evidence)
+    except (EvidencePersistError, SignerUnavailable, Exception) as exc:
+        # Provider already called — not success. Pre-send remains.
+        unk = _tr_outcome_unknown(
+            envelope,
+            authorization,
+            br,
+            reason=f"terminal_evidence_failed:{type(exc).__name__}",
+        )
+        # Do NOT overwrite pre-send; do not claim SENT/COMPLETED without terminal sign
+        raise OutcomeUnknownError(
+            receipt=unk,
+            pre_send_signed=pre_signed,
+            client_calls=br.calls,
+            response=getattr(br, "response", None),
+            reason=unk.reason,
+        ) from exc
+
     return br.response
 
 

@@ -1,69 +1,59 @@
-# BUILD_HANDOFF — OMNIS WING R3: evidence spine
+# BUILD_HANDOFF — OMNIS WING R3.1 evidence integrity repair
 
 **Final status: `READY_FOR_GATE`**
 
 Builder: Videl  
 Date: 2026-08-07  
 Repo: `~/projects/omnis-wing`  
-Base: `2ede5a1b25fbc2763041cf1347a3f7b49cf98676` (R2.1)  
+Prior HOLD candidate: `89fcf619ca0a57ba788b1e20e64495ed9490a8b7`  
 HEAD: *(gate: `git rev-parse HEAD`)*
 
-## CADMUS
+## CADMUS (unchanged)
 
-| Field | Value |
+`omnis_wing/spec/omnis-wing-r3-evidence-spine.cadmus-input.json`  
+SHA-256: `6f7563d2bfe9f3dc752c5d395ed153a6fb944332ad5f56ae84bc64a4af202f23`
+
+## P0-A closed — non-canonical Ed25519 rejected
+
+`ed25519_pure.verify` now rejects `S >= L` before the group equation (RFC 8032).
+
+Can-fail: valid signature mutated with `S' = S + L` → `verify == False` and `verify_signed_receipt == False`.
+
+## P0-B closed — no unrecorded provider call
+
+Selected path flow:
+
+1. Signer available + ledger `ensure_appendable` (else `REFUSE_POLICY_INVALID`, client 0)
+2. Evaluate ABSOLUTE decision (no client)
+3. On PERMIT: durable signed **pre-send** receipt `phase=TRANSMISSION_STARTED`, append ledger (else refuse, client 0)
+4. `broker.transmit` / client.create
+5. Durable signed **terminal** `TRANSMISSION_COMPLETED`
+6. If terminal sign/append fails after step 4 → `OutcomeUnknownError` (not success): client 1, pre-send remains verifiable, `ledger_outcome_report` → `OUTCOME_UNKNOWN` / `terminal_missing=true`. No fabricated SENT/COMPLETED.
+
+Can-fails:
+
+| Case | Observed |
 |---|---|
-| Path | `omnis_wing/spec/omnis-wing-r3-evidence-spine.cadmus-input.json` |
-| SHA-256 | `6f7563d2bfe9f3dc752c5d395ed153a6fb944332ad5f56ae84bc64a4af202f23` |
+| `available()` True, `sign()` raises pre-send | `REFUSE_POLICY_INVALID`, client 0, empty ledger |
+| Ledger not appendable pre-send | `REFUSE_POLICY_INVALID`, client 0 |
+| Provider returns, terminal sign fails | `OutcomeUnknownError`, client 1, pre-send signed, report OUTCOME_UNKNOWN |
+| Prior R3 can-fails | retained green |
 
-## What R3 adds
-
-Fail-closed cryptographic evidence on the **already governed R2.1** non-stream chat path:
-
-1. **Signer abstraction** — `Signer` protocol; `Ed25519TestSigner` (pure-Python Ed25519, test-only); `UnavailableSigner`.
-2. **Missing signer** → `REFUSE_POLICY_INVALID` **before** broker/client call (fake client 0).
-3. **Signed secret-free receipt** — envelope digest, decision, phase, policy/coverage, actual destination/provider/residency, findings correlation digest (IDs only), previous digest, sequence, key_id, receipt_digest, Ed25519 signature.
-4. **Append-only ledger** — JSONL with sequence + previous-digest + signature verification.
-5. **External anchor fixture** — binds chain head; whole-ledger replacement fails anchor verify.
-6. **Integrated** into `governed_chat_completions_create` via `WingEgressContext.evidence` (`EvidenceSession`).
-
-## Cold proof
+## Cold
 
 ```sh
-cd ~/projects/omnis-wing
 ./scripts/run_omnis_wing_v0_tests.sh
 ```
 
-Builder: **39/39 OK**.
+Builder: **44/44 OK**.
 
-| Can-fail | Observed |
-|---|---|
-| One-byte receipt/sig mutation | `verify_signed_receipt` false |
-| Ledger replaced with fresh chain | `verify_anchor` → `anchor_head_mismatch` |
-| Signer unavailable | `REFUSE_POLICY_INVALID`, client 0 |
-| Planted secret | absent from exception, receipt, ledger, anchor; no bare SHA-256 marker |
-| Protected CN + generic permit | still green **with signed evidence** on selected path |
-| R1.1 / R2.1 regression | green |
+## Anchor wording
 
-## Files
+Local `write_anchor` remains a **test-fixture external-anchor file**, not a production independent witness / HSM enrollment. Non-claim unchanged.
 
-| Path | Role |
-|---|---|
-| `omnis_wing/absolute/ed25519_pure.py` | Offline Ed25519 |
-| `omnis_wing/absolute/receipt_spine.py` | Sign / ledger / anchor |
-| `omnis_wing/absolute/hermes_chat_join.py` | Evidence session + fail-closed signer gate |
-| `tests/omnis_wing/test_r3_evidence_spine.py` | R3 can-fails |
-| `omnis_wing/spec/omnis-wing-r3-evidence-spine.cadmus-input.json` | Authority |
-| coverage / runner / BUILD_HANDOFF | honesty + cold command |
+## Non-claims (unchanged)
 
-Live Hermes / Keychain / network: **not touched**.
-
-## Non-claims
-
-- Not production Keychain / Secure Enclave enrollment.  
-- Not retro-signing legacy rows; not “whole product ledger globally signed.”  
-- Not streaming / other provider paths / full ABSOLUTE cert.  
-- Not live Videl wiring, real providers, package, push.  
-- Pure-Python Ed25519 is **test/offline spine**, not an HSM claim.
+Selected non-stream chat path only. No live Hermes, provider, Keychain, network, production HSM, package, push, or full ABSOLUTE verdict. Pure-Python Ed25519 is offline test spine, not SE.
 
 **READY_FOR_GATE**
 

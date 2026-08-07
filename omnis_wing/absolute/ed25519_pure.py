@@ -124,12 +124,16 @@ def decodepoint(s: bytes):
 
 
 def verify(m: bytes, sig: bytes, pk: bytes) -> bool:
+    """RFC 8032-style verification: reject non-canonical S (S >= L)."""
     if len(sig) != 64 or len(pk) != 32:
         return False
     try:
         R = decodepoint(sig[:32])
         A = decodepoint(pk)
         S = decodeint(sig[32:])
+        # P0-A: non-canonical scalar must not verify (S + k*L would otherwise pass)
+        if S >= l:
+            return False
         h = int.from_bytes(H(encodepoint(R) + pk + m), "little")
         return scalarmult(B, S) == edwards(R, scalarmult(A, h))
     except Exception:
