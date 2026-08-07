@@ -1,0 +1,37 @@
+{
+  "authority": "R5-R7 TERMINUS convergence bounded fork",
+  "non_claims": [
+    "not full TERMINUS ABSOLUTE",
+    "not live Hermes cutover",
+    "not Chinese remote safe for protected material without refuse/local/REDACT",
+    "not Keychain mutation in cold suite",
+    "not whole-tree workstation egress"
+  ],
+  "product": "OMNIS WING",
+  "r5_requirements": [
+    "payload fields are provenance authority",
+    "secrets scanned before dispatch",
+    "unknown provenance refuse",
+    "no sensitive mode switch",
+    "no raw secrets in receipts/health/ledger"
+  ],
+  "r6_primary_paths": [
+    "openai_non_stream",
+    "openai_stream",
+    "anthropic",
+    "bedrock",
+    "codex"
+  ],
+  "r7": [
+    "manifest exhaustive GOVERNED|DISABLED",
+    "transport guard importlib/reload/alias",
+    "health truth",
+    "adversarial revive refused"
+  ],
+  "rounds": [
+    "R5_payload_policy",
+    "R6_primary_path_joins",
+    "R7_coverage_adversarial"
+  ],
+  "schema": "cadmus-input.v1"
+}

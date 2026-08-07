@@ -147,6 +147,10 @@ def evaluate_decision(
         return auth("REFUSE_SOURCE_POLICY", code)
 
     for s in envelope.sources:
+        if s.classification == "credential":
+            return auth("REFUSE_SECRET", "credential-classified source refused")
+        if s.classification in ("unknown", ""):
+            return auth("REFUSE_SOURCE_POLICY", "unknown_provenance")
         if s.crown_jewel:
             return auth("REFUSE_CROWN_JEWEL", "crown-jewel source refused")
 

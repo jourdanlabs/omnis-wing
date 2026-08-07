@@ -198,19 +198,28 @@ class WingR2ChatPathTests(unittest.TestCase):
         self.assertEqual(client.create_calls, 0)
 
     def test_02_real_path_missing_provenance_refuse_zero_calls(self):
-        # Completion BBB: missing manual context is auto-filled from workspace.
-        # Empty sources with evidence still refuse SOURCE_POLICY.
+        # R5: unknown provenance (forced) refuses SOURCE_POLICY; empty wing sources
+        # are rebuilt from body (generic operator text may permit under force generic).
+        import os
         client2 = FakeClient(base_url=US_BASE)
-        with self.assertRaises(WingRefusal) as cm2:
-            interruptible_api_call(
-                MiniAgent(
-                    WingEgressContext(sources=(), evidence=_evidence()),
-                    client2,
-                ),
-                _api_kwargs(),
-            )
-        self.assertEqual(cm2.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
-        self.assertEqual(client2.create_calls, 0)
+        prev = os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION")
+        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "unknown"
+        try:
+            with self.assertRaises(WingRefusal) as cm2:
+                interruptible_api_call(
+                    MiniAgent(
+                        WingEgressContext(sources=(), evidence=_evidence()),
+                        client2,
+                    ),
+                    _api_kwargs(),
+                )
+            self.assertEqual(cm2.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
+            self.assertEqual(client2.create_calls, 0)
+        finally:
+            if prev is None:
+                os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
+            else:
+                os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = prev
 
         # Unavailable signer still refuses before client
         from omnis_wing.absolute.receipt_spine import UnavailableSigner, EvidenceLedger

@@ -53,7 +53,7 @@ from omnis_wing.absolute.receipt_spine import (
     make_test_signer,
 )
 
-R2_COVERAGE_CLASS = "AI_EGRESS_GOVERNED_R2_CHAT_COMPLETIONS_JOIN"
+R2_COVERAGE_CLASS = "AI_EGRESS_GOVERNED_R5_R7_SELECTED_FORK"
 R2_LANE = "hermes.chat_completions.non_stream"
 R2_POLICY_VERSION = POLICY_VERSION
 PATH_CLASS = "chat.completions"
@@ -95,6 +95,15 @@ ALLOWED_BODY_KEYS = frozenset(
         "prediction",
         "web_search_options",
         "stream_options",
+        "system",
+        "input",
+        "instructions",
+        "metadata",
+        "thinking",
+        "modelId",
+        "inferenceConfig",
+        "toolConfig",
+        "additionalModelRequestFields",
     }
 )
 
@@ -409,6 +418,12 @@ def build_envelope_for_chat(
         )
 
     assert payload is not None
+    # R5: sources from full canonical body, not workspace-name theater
+    from omnis_wing.absolute.payload_policy import analyze_payload_bytes
+
+    body_sources, _frags = analyze_payload_bytes(payload)
+    if body_sources:
+        sources = body_sources
     env = OutboundEnvelope.create(
         modality="chat",
         lane=lane,

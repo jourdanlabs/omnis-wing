@@ -93,16 +93,11 @@ ALLOWED_UNIVERSAL = ALLOWED_BODY_KEYS | EXTRA_BODY_KEYS
 
 
 def canonical_body_bytes(body: dict) -> tuple[Optional[bytes], Optional[str]]:
-    unknown = sorted(set(body.keys()) - ALLOWED_UNIVERSAL)
+    clean = {k: v for k, v in body.items() if not str(k).startswith("__wing")}
+    unknown = sorted(set(clean.keys()) - ALLOWED_UNIVERSAL)
     if unknown:
-        # Strip unknown rather than refuse? BBB: if cannot canonicalize safely, refuse
         return None, f"unsupported_body_fields:{','.join(unknown)}"
-    if body.get("stream") is True and body.get("__wing_allow_stream_flag") is not True:
-        # stream flag in body for non-stream join is rejected; streaming join sets allow
-        pass
     try:
-        # remove internal wing keys
-        clean = {k: v for k, v in body.items() if not str(k).startswith("__wing")}
         payload = stable_json_bytes(clean)
     except TypeError as exc:
         return None, str(exc)
@@ -252,7 +247,14 @@ def governed_callable_transmit(
             signed = None
         raise WingRefusal(early, signed=signed)
 
-    sources = tuple(wing_ctx.sources) if wing_ctx else ()
+    # R5: body fields are provenance authority
+    from omnis_wing.absolute.payload_policy import analyze_body, analyze_payload_bytes
+
+    clean_body = {k: v for k, v in body.items() if not str(k).startswith("__wing")}
+    body_sources, _ = analyze_body(clean_body)
+    if not body_sources:
+        body_sources, _ = analyze_payload_bytes(payload)
+    sources = body_sources
     envelope = OutboundEnvelope.create(
         modality="chat",
         lane=f"{R2_LANE}:{route_id}",

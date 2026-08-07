@@ -18,4 +18,5 @@ exec "$PY" -m unittest \
   tests.omnis_wing.test_completion_disabled \
   tests.omnis_wing.test_completion_p0_repair \
   tests.omnis_wing.test_production_cutover \
+  tests.omnis_wing.test_r5_r6_r7_convergence \
   -v

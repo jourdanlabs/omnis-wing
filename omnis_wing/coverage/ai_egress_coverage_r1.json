@@ -1,16 +1,17 @@
 {
   "schema": "omnis-wing.ai-egress-coverage.r1",
   "product": "OMNIS WING",
-  "coverage_class": "AI_EGRESS_GOVERNED_R1_SEAM_ONLY",
+  "coverage_class": "AI_EGRESS_GOVERNED_R5_R7_SELECTED_FORK",
   "claims_whole_tree_ai_egress": false,
   "claims_absolute_complete": false,
   "claims_all_hermes_chat_paths": false,
   "glass": {
-    "active_boundary": "AI EGRESS GOVERNED (R2.1 join + R3 evidence + R4 production signer boundary on selected path)",
+    "active_boundary": "AI EGRESS GOVERNED (R5 payload policy + R6 primary joins + R7 coverage) on WING fork",
     "also_true": [
-      "IDE-OWNED EGRESS GOVERNED \u2014 not claimed",
-      "WORKSTATION EGRESS NOT GOVERNED",
-      "Streaming / anthropic_messages / bedrock / codex_responses \u2014 outside_r2"
+      "NOT full TERMINUS ABSOLUTE",
+      "NOT live Hermes cutover",
+      "Protected material must be refused / local / REDACT \u2014 never silent CN forward",
+      "Outside-fork workstation/IDE egress not governed"
     ]
   },
   "governed_r1": [

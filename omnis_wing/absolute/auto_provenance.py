@@ -38,21 +38,38 @@ def classify_workspace(root: Path) -> str:
     return "generic"
 
 
-def build_auto_sources(payload_hint: str = "") -> tuple[SourceProvenance, ...]:
-    root = workspace_root()
-    classification = classify_workspace(root)
-    content = payload_hint or f"workspace:{root}"
-    d = hashlib.sha256(content.encode()).hexdigest()
-    src = SourceProvenance(
-        path=str(root / ".omnis-wing-workspace"),
-        content_digest=d,
-        classification=classification,
-        protected_root=classification in ("project", "protected"),
-        crown_jewel=False,
-        byte_range=None,
-        whole_content=True,
+def build_auto_sources(payload_hint: str = "", body: dict | None = None) -> tuple[SourceProvenance, ...]:
+    """R5: payload/body is the authority. Workspace path is never sole permit basis."""
+    from omnis_wing.absolute.payload_policy import analyze_body, analyze_payload_bytes, classify_bytes
+
+    if body is not None and isinstance(body, dict):
+        sources, _ = analyze_body(body)
+        return sources
+    if payload_hint:
+        # try parse as json body first
+        import json as _json
+        try:
+            obj = _json.loads(payload_hint)
+            if isinstance(obj, dict):
+                sources, _ = analyze_body(obj)
+                return sources
+        except Exception:
+            pass
+        sources, _ = analyze_payload_bytes(payload_hint.encode("utf-8", errors="replace"))
+        return sources
+    # No body at all — unknown provenance (fail closed at evaluate)
+    f = classify_bytes(b"", "missing_payload")
+    return (
+        SourceProvenance(
+            path="payload:missing",
+            content_digest=f.digest,
+            classification="unknown",
+            protected_root=True,
+            crown_jewel=False,
+            byte_range=None,
+            whole_content=True,
+        ),
     )
-    return (src,)
 
 
 def _default_ledger_path() -> Path:
@@ -113,8 +130,8 @@ def resolve_evidence_session(agent=None) -> EvidenceSession:
     return EvidenceSession(signer=UnavailableSigner(), ledger=ledger)
 
 
-def auto_wing_context(agent=None, payload_hint: str = "") -> WingEgressContext:
-    sources = build_auto_sources(payload_hint)
+def auto_wing_context(agent=None, payload_hint: str = "", body: dict | None = None) -> WingEgressContext:
+    sources = build_auto_sources(payload_hint, body=body)
     evidence = resolve_evidence_session(agent)
     return WingEgressContext(sources=sources, evidence=evidence)
 
@@ -143,7 +160,8 @@ def ensure_agent_wing_context(agent, api_kwargs: dict | None = None) -> WingEgre
             )[:2000]
         except Exception:
             hint = str(type(api_kwargs))
-    ctx = auto_wing_context(agent, payload_hint=hint)
+    body = api_kwargs if isinstance(api_kwargs, dict) else None
+    ctx = auto_wing_context(agent, payload_hint=hint, body=body)
     try:
         agent.wing_egress_context = ctx
     except Exception:

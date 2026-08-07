@@ -20,8 +20,8 @@ Classification = Literal[
     "unknown",
 ]
 
-POLICY_VERSION = "omnis-wing.absolute-r1.v1"
-COVERAGE_CLASS = "AI_EGRESS_GOVERNED_R1_SEAM_ONLY"
+POLICY_VERSION = "omnis-wing.absolute-r5.v1"
+COVERAGE_CLASS = "AI_EGRESS_GOVERNED_R5_R7_SELECTED_FORK"
 
 
 def _sha256_bytes(data: bytes) -> str:

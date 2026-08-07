@@ -92,8 +92,20 @@ def build_health_report(
     else:
         verifier = "OK"
 
+    try:
+        from omnis_wing.completion.product_disable import load_manifest
+        _man = load_manifest()
+        _routes = {
+            "summary": _man.get("summary"),
+            "governed": [r["route_id"] for r in _man["routes"] if r["state"] == "GOVERNED"],
+            "disabled": [r["route_id"] for r in _man["routes"] if r["state"] == "DISABLED"],
+        }
+    except Exception:
+        _routes = {"summary": {}, "governed": [], "disabled": []}
+
     report = {
         "schema": "omnis-wing.operator-health.v1",
+        "route_manifest": _routes,
         "enrollment": {
             "state": enrollment.get("state"),
             "ready": bool(enrollment.get("ready")),

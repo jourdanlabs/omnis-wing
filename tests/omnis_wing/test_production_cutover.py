@@ -141,14 +141,24 @@ def _write_cfg(dirpath: Path, **fields) -> Path:
 
 class ProductionCutoverTests(unittest.TestCase):
     def setUp(self):
-        for k in list(os.environ.keys()):
-            if k.startswith("OMNIS_WING_") and k not in ("OMNIS_WING_FORCE_CLASSIFICATION",):
-                os.environ.pop(k, None)
+        for k in (
+            "OMNIS_WING_PRODUCTION_CONFIG",
+            "OMNIS_WING_SIGNER_BACKEND",
+            "OMNIS_WING_P256_WORK_DIR",
+            "OMNIS_WING_BRIDGE_PATH",
+            "OMNIS_WING_LEDGER_DIR_OVERRIDE",
+        ):
+            os.environ.pop(k, None)
         os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
         self.td = Path(tempfile.mkdtemp(prefix="wing-pc-"))
         os.environ["OMNIS_WING_LEDGER_DIR"] = str(self.td / "ledgers")
+        # default test mode unless a production test overrides
+        os.environ.setdefault("OMNIS_WING_SIGNER_MODE", "test")
 
     def tearDown(self):
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
+        os.environ.pop("OMNIS_WING_PRODUCTION_CONFIG", None)
+        os.environ.pop("OMNIS_WING_P256_WORK_DIR", None)
         shutil.rmtree(self.td, ignore_errors=True)
 
     def test_01_production_mode_no_config_refuse_zero_calls(self):
