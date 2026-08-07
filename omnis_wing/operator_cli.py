@@ -79,10 +79,39 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--root", default=".")
     sp.add_argument("--anchor", default="")
 
+    sp = sub.add_parser("coverage", help="show route manifest GOVERNED/DISABLED")
+    sp = sub.add_parser("verify", help="verify ledger chain (alias of health chain focus)")
+    sp.add_argument("--ledger", required=True)
+    sp.add_argument("--root", default=".")
+    sp.add_argument("--backend", choices=("test", "keychain"), default="test")
+    sp.add_argument("--tag", default="ai.jourdanlabs.omnis-wing.test.r4")
+    sp.add_argument("--bridge", default="")
+    sp.add_argument("--state-dir", default=".omnis-wing-build/operator-state")
     sp = sub.add_parser("compile-bridge", help="compile Swift keychain bridge (operator)")
     sp.add_argument("--out-dir", default=".omnis-wing-build")
 
     args = p.parse_args(argv)
+    if args.cmd == "coverage":
+        from omnis_wing.completion.product_disable import load_manifest
+        man = load_manifest()
+        print(json.dumps({"summary": man.get("summary"), "routes": [
+            {"route_id": r["route_id"], "state": r["state"], "source": r.get("source"),
+             "disable_reason": r.get("disable_reason")}
+            for r in man["routes"]
+        ]}, indent=2, sort_keys=True))
+        return 0
+
+    if args.cmd == "verify":
+        # reuse health
+        args.cmd = "health"
+        # fall through by re-dispatch - call health path
+        ledger = EvidenceLedger(Path(args.ledger))
+        adapter = _backend(args)
+        from omnis_wing.absolute.operator_health import build_health_report, health_to_json
+        report = build_health_report(root=Path(args.root).resolve(), ledger=ledger, signer=adapter)
+        sys.stdout.write(health_to_json(report))
+        return 0 if report.get("ledger", {}).get("chain_valid") else 1
+
     if args.cmd == "compile-bridge":
         out = compile_keychain_bridge(Path(args.out_dir))
         print(json.dumps({"bridge": str(out), "state": "COMPILED"}))

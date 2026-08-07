@@ -198,14 +198,8 @@ class WingR2ChatPathTests(unittest.TestCase):
         self.assertEqual(client.create_calls, 0)
 
     def test_02_real_path_missing_provenance_refuse_zero_calls(self):
-        # No context at all → R3 fail-closed signer gate first
-        client = FakeClient(base_url=US_BASE)
-        with self.assertRaises(WingRefusal) as cm:
-            interruptible_api_call(MiniAgent(None, client), _api_kwargs())
-        self.assertEqual(cm.exception.receipt.decision, "REFUSE_POLICY_INVALID")
-        self.assertEqual(client.create_calls, 0)
-
-        # Evidence present but empty sources → REFUSE_SOURCE_POLICY
+        # Completion BBB: missing manual context is auto-filled from workspace.
+        # Empty sources with evidence still refuse SOURCE_POLICY.
         client2 = FakeClient(base_url=US_BASE)
         with self.assertRaises(WingRefusal) as cm2:
             interruptible_api_call(
@@ -217,6 +211,22 @@ class WingR2ChatPathTests(unittest.TestCase):
             )
         self.assertEqual(cm2.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
         self.assertEqual(client2.create_calls, 0)
+
+        # Unavailable signer still refuses before client
+        from omnis_wing.absolute.receipt_spine import UnavailableSigner, EvidenceLedger
+        import tempfile
+        from pathlib import Path as P
+        from omnis_wing.absolute.hermes_chat_join import EvidenceSession
+        td = P(tempfile.mkdtemp())
+        ev = EvidenceSession(signer=UnavailableSigner(), ledger=EvidenceLedger(td / "l.jsonl"))
+        client3 = FakeClient(base_url=US_BASE)
+        with self.assertRaises(WingRefusal) as cm3:
+            interruptible_api_call(
+                MiniAgent(WingEgressContext(sources=_ctx("generic").sources, evidence=ev), client3),
+                _api_kwargs(),
+            )
+        self.assertEqual(cm3.exception.receipt.decision, "REFUSE_POLICY_INVALID")
+        self.assertEqual(client3.create_calls, 0)
 
     def test_03_real_path_generic_permit_one_call_full_body_bytes_equal(self):
         messages = list(MESSAGES)

@@ -192,63 +192,97 @@ def interruptible_api_call(agent, api_kwargs: dict):
 
     def _call():
         try:
-            if agent.api_mode == "codex_responses":
-                request_client = _set_request_client(
-                    agent._create_request_openai_client(
-                        reason="codex_stream_request",
-                        api_kwargs=api_kwargs,
-                    )
-                )
-                result["response"] = agent._run_codex_stream(
-                    api_kwargs,
-                    client=request_client,
-                    on_first_delta=getattr(agent, "_codex_on_first_delta", None),
-                )
-            elif agent.api_mode == "anthropic_messages":
-                result["response"] = agent._anthropic_messages_create(api_kwargs)
-            elif agent.api_mode == "bedrock_converse":
-                # Bedrock uses boto3 directly — no OpenAI client needed.
-                # normalize_converse_response produces an OpenAI-compatible
-                # SimpleNamespace so the rest of the agent loop can treat
-                # bedrock responses like chat_completions responses.
-                from agent.bedrock_adapter import (
-                    _get_bedrock_runtime_client,
-                    invalidate_runtime_client,
-                    is_stale_connection_error,
-                    normalize_converse_response,
-                )
-                region = api_kwargs.pop("__bedrock_region__", "us-east-1")
-                api_kwargs.pop("__bedrock_converse__", None)
-                client = _get_bedrock_runtime_client(region)
-                try:
-                    raw_response = client.converse(**api_kwargs)
-                except Exception as _bedrock_exc:
-                    # Evict the cached client on stale-connection failures
-                    # so the outer retry loop builds a fresh client/pool.
-                    if is_stale_connection_error(_bedrock_exc):
-                        invalidate_runtime_client(region)
-                    raise
-                result["response"] = normalize_converse_response(raw_response)
-            else:
-                request_client = _set_request_client(
-                    agent._create_request_openai_client(
-                        reason="chat_completion_request",
-                        api_kwargs=api_kwargs,
-                    )
-                )
-                # OMNIS WING R2: ordinary non-streaming chat_completions join.
-                # Direct client.chat.completions.create is not used on this path;
-                # all traffic goes through dispatch_outbound first.
-                from omnis_wing.absolute.hermes_chat_join import (
-                    governed_chat_completions_create,
-                    resolve_wing_context,
-                )
+            from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
+            from omnis_wing.absolute.runtime_context import set_wing_agent, reset_wing_agent
+            from omnis_wing.absolute.universal_egress import governed_callable_transmit
+            from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
 
-                result["response"] = governed_chat_completions_create(
-                    request_client,
-                    api_kwargs,
-                    resolve_wing_context(agent),
-                )
+            _wing_tok = set_wing_agent(agent)
+            ensure_agent_wing_context(agent, api_kwargs)
+            try:
+                if agent.api_mode == "codex_responses":
+                    request_client = _set_request_client(
+                        agent._create_request_openai_client(
+                            reason="codex_stream_request",
+                            api_kwargs=api_kwargs,
+                        )
+                    )
+
+                    def _codex_tx(body):
+                        return agent._run_codex_stream(
+                            body,
+                            client=request_client,
+                            on_first_delta=getattr(agent, "_codex_on_first_delta", None),
+                        )
+
+                    result["response"] = governed_callable_transmit(
+                        agent=agent,
+                        body=dict(api_kwargs),
+                        transmit_fn=_codex_tx,
+                        client=request_client,
+                        route_id="agent.interruptible.codex_responses.non_stream",
+                    )
+                elif agent.api_mode == "anthropic_messages":
+                    def _ant_tx(body):
+                        agent._wing_in_governed_transmit = True
+                        try:
+                            return agent._anthropic_messages_create(body)
+                        finally:
+                            agent._wing_in_governed_transmit = False
+
+                    result["response"] = governed_callable_transmit(
+                        agent=agent,
+                        body=dict(api_kwargs),
+                        transmit_fn=_ant_tx,
+                        client=None,
+                        route_id="agent.interruptible.anthropic_messages.non_stream",
+                    )
+                elif agent.api_mode == "bedrock_converse":
+                    from agent.bedrock_adapter import (
+                        _get_bedrock_runtime_client,
+                        invalidate_runtime_client,
+                        is_stale_connection_error,
+                        normalize_converse_response,
+                    )
+                    region = api_kwargs.pop("__bedrock_region__", "us-east-1")
+                    api_kwargs.pop("__bedrock_converse__", None)
+                    # stash region on agent for destination derivation
+                    try:
+                        agent._bedrock_region = region
+                    except Exception:
+                        pass
+                    client = _get_bedrock_runtime_client(region)
+
+                    def _bed_tx(body):
+                        try:
+                            raw_response = client.converse(**body)
+                        except Exception as _bedrock_exc:
+                            if is_stale_connection_error(_bedrock_exc):
+                                invalidate_runtime_client(region)
+                            raise
+                        return normalize_converse_response(raw_response)
+
+                    result["response"] = governed_callable_transmit(
+                        agent=agent,
+                        body=dict(api_kwargs),
+                        transmit_fn=_bed_tx,
+                        client=None,
+                        route_id="agent.interruptible.bedrock_converse.non_stream",
+                    )
+                else:
+                    request_client = _set_request_client(
+                        agent._create_request_openai_client(
+                            reason="chat_completion_request",
+                            api_kwargs=api_kwargs,
+                        )
+                    )
+                    result["response"] = governed_chat_completions_create(
+                        request_client,
+                        api_kwargs,
+                        ensure_agent_wing_context(agent, api_kwargs),
+                    )
+            finally:
+                reset_wing_agent(_wing_tok)
         except Exception as e:
             # If the request was cancelled by the main thread's interrupt
             # handler, the transport error is the expected consequence of our
@@ -1512,7 +1546,12 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                 _summary_result = _tsum.normalize_response(summary_response, strip_tool_prefix=agent._is_anthropic_oauth)
                 final_response = (_summary_result.content or "").strip()
             else:
-                summary_response = agent._ensure_primary_openai_client(reason="iteration_limit_summary").chat.completions.create(**summary_kwargs)
+                from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+                from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
+                _sc = agent._ensure_primary_openai_client(reason="iteration_limit_summary")
+                summary_response = governed_chat_completions_create(
+                    _sc, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs)
+                )
                 _summary_result = agent._get_transport().normalize_response(summary_response)
                 final_response = (_summary_result.content or "").strip()
 
@@ -1555,7 +1594,12 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                 if summary_extra_body:
                     summary_kwargs["extra_body"] = summary_extra_body
 
-                summary_response = agent._ensure_primary_openai_client(reason="iteration_limit_summary_retry").chat.completions.create(**summary_kwargs)
+                from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+                from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
+                _sc2 = agent._ensure_primary_openai_client(reason="iteration_limit_summary_retry")
+                summary_response = governed_chat_completions_create(
+                    _sc2, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs)
+                )
                 _retry_result = agent._get_transport().normalize_response(summary_response)
                 final_response = (_retry_result.content or "").strip()
 
@@ -1639,9 +1683,20 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
         finally:
             agent._codex_on_first_delta = None
 
+    # OMNIS WING completion: Anthropic streaming uses governed non-stream door
+    # (create_anthropic_message under universal egress). No silent stream bypass.
+    if agent.api_mode == "anthropic_messages":
+        return interruptible_api_call(agent, api_kwargs)
+
+
+    # OMNIS WING completion: Bedrock streaming is folded into the governed
+    # non-stream door (converse under universal egress). No silent stream bypass.
+    if agent.api_mode == "bedrock_converse":
+        return interruptible_api_call(agent, api_kwargs)
+
     # Bedrock Converse uses boto3's converse_stream() with real-time delta
     # callbacks — same UX as Anthropic and chat_completions streaming.
-    if agent.api_mode == "bedrock_converse":
+    if False and agent.api_mode == "bedrock_converse":
         result = {"response": None, "error": None}
         first_delta_fired = {"done": False}
         deltas_were_sent = {"yes": False}
@@ -1873,7 +1928,15 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
         # ``request_client_holder["diag"]`` for closure access.
         _diag = agent._stream_diag_init()
         request_client_holder["diag"] = _diag
-        stream = request_client.chat.completions.create(**stream_kwargs)
+        from omnis_wing.absolute.universal_egress import governed_streaming_create
+        from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
+        ensure_agent_wing_context(agent, stream_kwargs)
+        stream = governed_streaming_create(
+            agent=agent,
+            client=request_client,
+            api_kwargs=stream_kwargs,
+            route_id="agent.interruptible_streaming.chat_completions",
+        )
 
         # Capture rate limit headers from the initial HTTP response.
         # The OpenAI SDK Stream object exposes the underlying httpx
