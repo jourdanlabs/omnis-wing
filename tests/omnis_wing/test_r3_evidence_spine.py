@@ -417,5 +417,48 @@ class R3EvidenceTests(unittest.TestCase):
 
 
 
+    def test_12_pre_send_fsync_fail_client_0_no_flattering(self):
+        """fsync fail on first (pre-send) append → refuse, client 0, no durable start."""
+        ledger = EvidenceLedger(self.td / "ledger.jsonl")
+        ledger._force_fsync_fail_on = 1  # type: ignore[attr-defined]
+        ledger._skip_ensure_fsync_probe = True  # type: ignore[attr-defined]
+        ev = EvidenceSession(signer=make_test_signer(), ledger=ledger)
+        ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
+        client = FakeClient(US_BASE)
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(MiniAgent(ctx, client), _api_kwargs())
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_POLICY_INVALID")
+        self.assertIn("pre_send_evidence_failed", cm.exception.receipt.reason)
+        self.assertEqual(client.create_calls, 0)
+        self.assertEqual(ev.ledger.load_entries(), [])
+        secret = PLANTED_SECRET_MARKERS[0]
+        blob = str(cm.exception) + cm.exception.receipt.serialize_for_hygiene()
+        self.assertNotIn(secret, blob)
+
+    def test_13_terminal_fsync_fail_outcome_unknown_preserves_presend(self):
+        """fsync fail on second (terminal) append after provider → OutcomeUnknown."""
+        ledger = EvidenceLedger(self.td / "ledger.jsonl")
+        ledger._force_fsync_fail_on = 2  # type: ignore[attr-defined]
+        ledger._skip_ensure_fsync_probe = True  # type: ignore[attr-defined]
+        ev = EvidenceSession(signer=make_test_signer(), ledger=ledger)
+        ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
+        client = FakeClient(US_BASE)
+        with self.assertRaises(OutcomeUnknownError) as cm:
+            interruptible_api_call(MiniAgent(ctx, client), _api_kwargs())
+        self.assertEqual(cm.exception.client_calls, 1)
+        self.assertEqual(client.create_calls, 1)
+        entries = ev.ledger.load_entries()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["phase"], "TRANSMISSION_STARTED")
+        self.assertTrue(
+            verify_signed_receipt(entries[0], make_test_signer().public_key_bytes())
+        )
+        report = ledger_outcome_report(ev.ledger)
+        self.assertEqual(report["status"], "OUTCOME_UNKNOWN")
+        self.assertTrue(report["terminal_missing"])
+        # not a normal success path
+        self.assertIsNotNone(cm.exception.pre_send_signed)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -257,16 +257,41 @@ class EvidenceLedger:
     def next_sequence(self) -> int:
         return len(self.load_entries()) + 1
 
+    def _fsync_count(self) -> int:
+        return int(getattr(self, "_fsync_calls", 0))
+
+    def _durable_fsync(self, f) -> None:
+        """os.fsync before append returns — required for durable pre-send contract."""
+        n = int(getattr(self, "_fsync_calls", 0)) + 1
+        self._fsync_calls = n
+        fail_on = getattr(self, "_force_fsync_fail_on", None)
+        if fail_on is not None and n == int(fail_on):
+            raise OSError("fsync_injected_fail")
+        if getattr(self, "_force_fsync_fail", False):
+            raise OSError("fsync_injected_fail")
+        os.fsync(f.fileno())
+
     def ensure_appendable(self) -> None:
-        """Fail before send if ledger cannot be written."""
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as f:
-                f.flush()
-        except OSError as exc:
-            raise EvidencePersistError(f"ledger_not_appendable:{exc}") from exc
+        """Prove write + fsync capability on the ledger path (advisory gate).
+
+        Authority remains append()+fsync success before transmit; this only
+        fails closed early when the filesystem cannot support that path.
+        """
         if getattr(self, "_force_unappendable", False):
             raise EvidencePersistError("ledger_not_appendable:forced")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            # Do not bump the real append fsync counter here — probe only.
+            with self.path.open("a", encoding="utf-8") as f:
+                f.flush()
+                if getattr(self, "_force_fsync_fail_on", None) == 0:
+                    raise OSError("fsync_injected_fail")
+                # Probe fsync without consuming append-phase inject counters
+                if getattr(self, "_skip_ensure_fsync_probe", False):
+                    return
+                os.fsync(f.fileno())
+        except OSError as exc:
+            raise EvidencePersistError(f"ledger_not_appendable:{exc}") from exc
 
     def append(self, receipt: SignedEvidenceReceipt) -> None:
         if getattr(self, "_force_unappendable", False):
@@ -278,12 +303,26 @@ class EvidenceLedger:
             raise ValueError("previous_digest chain break on append")
         if receipt.sequence != seq:
             raise ValueError("sequence break on append")
+        prev_size = self.path.stat().st_size if self.path.exists() else 0
         try:
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(receipt.serialize() + "\n")
                 f.flush()
+                self._durable_fsync(f)
         except OSError as exc:
-            raise EvidencePersistError(f"ledger_append_failed:{exc}") from exc
+            # Roll back this process-visible write so a failed fsync cannot
+            # leave flattering pre-send evidence without durability.
+            try:
+                with self.path.open("rb+") as rf:
+                    rf.truncate(prev_size)
+                    rf.flush()
+                    try:
+                        os.fsync(rf.fileno())
+                    except OSError:
+                        pass
+            except OSError:
+                pass
+            raise EvidencePersistError(f"ledger_fsync_or_append_failed:{exc}") from exc
 
     def verify_chain(self, public_key: bytes) -> tuple[bool, str]:
         entries = self.load_entries()
