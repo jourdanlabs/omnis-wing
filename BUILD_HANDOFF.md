@@ -1,6 +1,10 @@
 # BUILD_HANDOFF — OMNIS WING R4.1 algorithm-bound receipt verification
 
-**Final status: `READY_FOR_GATE`**
+**Final status: `CLEAR` (Bulma gate — bounded R4.1)**
+
+Gate candidate: `89ccebae7922cab0645ecb4e8d145eb5d8a469c5`  
+Cleared: production signer + verifier/health on selected ordinary non-stream chat path only.  
+`UNVERIFIED_AT_READ` must not become hardware attestation. Not live Hermes / streaming / remote anchor / whole-tree / full ABSOLUTE.
 
 Builder: Videl  
 Prior HOLD: `dccf6c4ce2be2a001e67db1091b817fcc0b5c731`  
