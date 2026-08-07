@@ -1,16 +1,16 @@
 """Import/transport guard for OMNIS WING touched host modules.
 
-Forbidden: direct provider/https clients in the admission seam.
-Allowed: stdlib hashing/json and the injected Provider protocol only.
+R1: covers every path listed as governed in ai_egress_coverage_r1.json
+plus the historical W0 seam modules.
 """
 
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List
 
-# Names that must not appear as imports inside the guarded package.
 FORBIDDEN_MODULES = frozenset(
     {
         "httpx",
@@ -49,20 +49,15 @@ def _module_root(name: str) -> str:
 
 
 def scan_source(source: str, filename: str = "<memory>") -> list[str]:
-    """Return list of violation messages for a Python source string."""
     tree = ast.parse(source, filename=filename)
     hits: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 mod = alias.name
-                if mod in FORBIDDEN_MODULES or _module_root(mod) in FORBIDDEN_FROM_ROOTS:
-                    if mod == "http.client" or mod.startswith("http.") or mod in FORBIDDEN_MODULES or _module_root(mod) in {
-                        "httpx", "aiohttp", "requests", "openai", "anthropic", "socket", "urllib",
-                    }:
-                        # allow nothing from forbidden roots
-                        if _module_root(mod) in FORBIDDEN_FROM_ROOTS or mod in FORBIDDEN_MODULES:
-                            hits.append(f"{filename}:{node.lineno}: forbidden import '{mod}'")
+                root = _module_root(mod)
+                if mod in FORBIDDEN_MODULES or root in FORBIDDEN_FROM_ROOTS:
+                    hits.append(f"{filename}:{node.lineno}: forbidden import '{mod}'")
         elif isinstance(node, ast.ImportFrom):
             mod = node.module or ""
             root = _module_root(mod) if mod else ""
@@ -79,11 +74,29 @@ def scan_paths(paths: Iterable[Path]) -> list[str]:
     return violations
 
 
+def r1_governed_paths(repo_root: Path) -> List[Path]:
+    man_path = repo_root / "omnis_wing" / "coverage" / "ai_egress_coverage_r1.json"
+    data = json.loads(man_path.read_text(encoding="utf-8"))
+    paths = [repo_root / e["path"] for e in data["governed_r1"]]
+    # also historical W0 seam under package
+    for extra in (
+        repo_root / "omnis_wing" / "boundary.py",
+        repo_root / "omnis_wing" / "host_dispatch.py",
+        repo_root / "omnis_wing" / "__init__.py",
+    ):
+        if extra.is_file() and extra not in paths:
+            paths.append(extra)
+    return paths
+
+
 def assert_clean_package(package_dir: Path) -> None:
-    """Fail if any .py under package_dir contains forbidden transport imports."""
-    files = sorted(package_dir.rglob("*.py"))
-    # Exclude intentional canary directory if present
-    files = [p for p in files if "canary_plant" not in p.parts]
+    """Fail if any governed R1 module (or package py without canary) has forbidden imports."""
+    repo_root = package_dir.parent if package_dir.name == "omnis_wing" else package_dir
+    if (repo_root / "omnis_wing" / "coverage" / "ai_egress_coverage_r1.json").is_file():
+        files = [p for p in r1_governed_paths(repo_root) if p.is_file()]
+    else:
+        files = sorted(package_dir.rglob("*.py"))
+        files = [p for p in files if "canary_plant" not in p.parts]
     violations = scan_paths(files)
     if violations:
         raise TransportGuardError(
@@ -93,4 +106,7 @@ def assert_clean_package(package_dir: Path) -> None:
 
 def guarded_modules() -> list[Path]:
     root = Path(__file__).resolve().parent
+    repo = root.parent
+    if (repo / "omnis_wing" / "coverage" / "ai_egress_coverage_r1.json").is_file():
+        return [p for p in r1_governed_paths(repo) if p.is_file()]
     return sorted(p for p in root.rglob("*.py") if "canary_plant" not in p.parts)

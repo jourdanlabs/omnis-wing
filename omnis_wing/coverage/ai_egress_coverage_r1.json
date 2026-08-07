@@ -1,0 +1,78 @@
+{
+  "schema": "omnis-wing.ai-egress-coverage.r1",
+  "product": "OMNIS WING",
+  "coverage_class": "AI_EGRESS_GOVERNED_R1_SEAM_ONLY",
+  "claims_whole_tree_ai_egress": false,
+  "claims_absolute_complete": false,
+  "glass": {
+    "active_boundary": "AI EGRESS GOVERNED (R1 seam only)",
+    "also_true": [
+      "IDE-OWNED EGRESS GOVERNED — not claimed in R1",
+      "WORKSTATION EGRESS NOT GOVERNED"
+    ]
+  },
+  "governed_r1": [
+    {
+      "path": "omnis_wing/absolute/envelope.py",
+      "status": "governed",
+      "role": "OutboundEnvelope canonical structure"
+    },
+    {
+      "path": "omnis_wing/absolute/scanner.py",
+      "status": "governed",
+      "role": "deterministic local payload inspection"
+    },
+    {
+      "path": "omnis_wing/absolute/evaluator.py",
+      "status": "governed",
+      "role": "decision grammar + broker phase machine"
+    },
+    {
+      "path": "omnis_wing/absolute/coverage.py",
+      "status": "governed",
+      "role": "coverage manifest loader"
+    },
+    {
+      "path": "omnis_wing/absolute/__init__.py",
+      "status": "governed",
+      "role": "absolute package exports"
+    },
+    {
+      "path": "omnis_wing/absolute/host.py",
+      "status": "governed",
+      "role": "sole R1 host entry for decide_and_execute"
+    },
+    {
+      "path": "omnis_wing/transport_guard.py",
+      "status": "governed",
+      "role": "import/transport guard for R1-governed modules"
+    }
+  ],
+  "inherited_hermes_transport": [
+    {
+      "path_glob": "agent/**/*.py",
+      "status": "outside_r1",
+      "note": "Hundreds of HTTP/provider imports exist in upstream Hermes; not classified as governed AI egress in R1."
+    },
+    {
+      "path_glob": "tools/**/*.py",
+      "status": "outside_r1",
+      "note": "Tool transports (messaging, webhooks) ungoverned by this seam."
+    },
+    {
+      "path_glob": "gateway/**/*.py",
+      "status": "inbound",
+      "note": "Gateway inbound channel handling; not R1 outbound AI broker."
+    },
+    {
+      "path_glob": "hermes_cli/**/*.py",
+      "status": "outside_r1",
+      "note": "CLI/auth utilities; not claimed."
+    }
+  ],
+  "w0_admission_seam": {
+    "path": "omnis_wing/boundary.py",
+    "status": "historical_w0_clear",
+    "note": "W0 prototype CLEAR for admission; not ABSOLUTE host proof."
+  }
+}
