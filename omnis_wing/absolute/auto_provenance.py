@@ -9,13 +9,8 @@ from typing import Optional
 
 from omnis_wing.absolute.envelope import SourceProvenance
 from omnis_wing.absolute.hermes_chat_join import EvidenceSession, WingEgressContext
-from omnis_wing.absolute.production_signer import (
-    DisposableTestBackend,
-    ProductionSignerAdapter,
-)
-from omnis_wing.absolute.receipt_spine import EvidenceLedger, make_test_signer
+from omnis_wing.absolute.receipt_spine import EvidenceLedger, UnavailableSigner, make_test_signer
 
-# Roots treated as protected/project when payload originates under them
 _DEFAULT_PROTECTED_NAME_MARKERS = (
     "chamber",
     "jourdanlabs",
@@ -23,14 +18,6 @@ _DEFAULT_PROTECTED_NAME_MARKERS = (
     "pan-cc",
     "projects",
 )
-
-
-def _digest_path(p: Path) -> str:
-    try:
-        data = p.read_bytes() if p.is_file() else str(p.resolve()).encode()
-    except Exception:
-        data = str(p).encode()
-    return hashlib.sha256(data).hexdigest()
 
 
 def workspace_root() -> Path:
@@ -41,14 +28,12 @@ def workspace_root() -> Path:
 
 
 def classify_workspace(root: Path) -> str:
-    """Derive classification without Captain choosing a mode."""
     force = os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION")
     if force in ("generic", "project", "protected"):
         return force
     name = root.name.lower()
     parts = {p.lower() for p in root.parts}
     if any(m in name or m in parts for m in _DEFAULT_PROTECTED_NAME_MARKERS):
-        # Working inside JL/project trees defaults to project classification
         return "project"
     return "generic"
 
@@ -71,17 +56,30 @@ def build_auto_sources(payload_hint: str = "") -> tuple[SourceProvenance, ...]:
 
 
 def _default_ledger_path() -> Path:
-    base = Path(os.environ.get("OMNIS_WING_LEDGER_DIR") or (Path.home() / ".omnis-wing" / "ledgers"))
+    base = Path(
+        os.environ.get("OMNIS_WING_LEDGER_DIR")
+        or (Path.home() / ".omnis-wing" / "ledgers")
+    )
     base.mkdir(parents=True, exist_ok=True)
     return base / "wing-completion-ledger.jsonl"
 
 
 def resolve_evidence_session(agent=None) -> EvidenceSession:
-    """Explicit production signer if agent provides one; else cold-safe test signer.
+    """Resolve evidence session for the selected path.
 
-    Production enrollment remains operator-only. Missing production key in
-    production mode refuses at sign time (available=False).
+    Product default: production signer required (agent.wing_production_signer or
+    explicitly configured production backend). Disposable test signer is **opt-in
+    only** via OMNIS_WING_SIGNER_MODE=test (harness). Missing production signer
+    → UnavailableSigner → REFUSE_POLICY_INVALID before provider call.
     """
+    # Install side-door product disables on every evidence resolution (startup path)
+    try:
+        from omnis_wing.completion.side_doors import install_side_door_guards
+
+        install_side_door_guards()
+    except Exception:
+        pass
+
     if agent is not None:
         existing = getattr(agent, "wing_evidence_session", None)
         if existing is not None:
@@ -98,17 +96,15 @@ def resolve_evidence_session(agent=None) -> EvidenceSession:
                 pass
             return sess
 
-    # Disposable cold / default fork path: test signer (not Keychain)
-    mode = os.environ.get("OMNIS_WING_SIGNER_MODE", "test")
     ledger = EvidenceLedger(_default_ledger_path())
-    if mode == "production":
-        # Caller must set agent.wing_production_signer; bare production mode without
-        # signer → unavailable session via empty sources path handled upstream
-        from omnis_wing.absolute.receipt_spine import UnavailableSigner
+    mode = (os.environ.get("OMNIS_WING_SIGNER_MODE") or "production").strip().lower()
 
-        return EvidenceSession(signer=UnavailableSigner(), ledger=ledger)
+    if mode == "test":
+        # Explicit harness opt-in only
+        return EvidenceSession(signer=make_test_signer(), ledger=ledger)
 
-    return EvidenceSession(signer=make_test_signer(), ledger=ledger)
+    # Product default — fail closed without production signer
+    return EvidenceSession(signer=UnavailableSigner(), ledger=ledger)
 
 
 def auto_wing_context(agent=None, payload_hint: str = "") -> WingEgressContext:
@@ -120,9 +116,15 @@ def auto_wing_context(agent=None, payload_hint: str = "") -> WingEgressContext:
 def ensure_agent_wing_context(agent, api_kwargs: dict | None = None) -> WingEgressContext:
     """Attach auto context if missing — no Captain-sensitive mode switch.
 
-    Explicit context (including empty sources) is preserved so SOURCE_POLICY
-    refusals remain testable and intentional empty provenance is not overwritten.
+    Explicit context (including empty sources) is preserved.
     """
+    try:
+        from omnis_wing.completion.side_doors import install_side_door_guards
+
+        install_side_door_guards()
+    except Exception:
+        pass
+
     ctx = getattr(agent, "wing_egress_context", None)
     if ctx is not None:
         if getattr(ctx, "evidence", None) is None:
@@ -133,7 +135,9 @@ def ensure_agent_wing_context(agent, api_kwargs: dict | None = None) -> WingEgre
         import json as _json
 
         try:
-            hint = _json.dumps(api_kwargs.get("messages") or api_kwargs, default=str)[:2000]
+            hint = _json.dumps(
+                api_kwargs.get("messages") or api_kwargs, default=str
+            )[:2000]
         except Exception:
             hint = str(type(api_kwargs))
     ctx = auto_wing_context(agent, payload_hint=hint)

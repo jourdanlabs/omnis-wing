@@ -6,6 +6,12 @@ provider body dicts and transmit callables.
 
 from __future__ import annotations
 
+try:
+    from omnis_wing.completion.side_doors import install_side_door_guards
+    install_side_door_guards()
+except Exception:
+    pass
+
 import json
 from dataclasses import dataclass
 from typing import Any, Callable, Optional

@@ -119,6 +119,7 @@ class CompletionRouteTests(unittest.TestCase):
         self.assertGreaterEqual(man["summary"]["DISABLED"], 1)
 
     def test_02_auto_provenance_chat_completions(self):
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
         client = FakeClient(US)
         agent = MiniAgent(client)
         # no manual wing_ctx — auto
@@ -162,6 +163,7 @@ class CompletionRouteTests(unittest.TestCase):
         self.assertEqual(client.create_calls, 0)
 
     def test_05_codex_mode_governed(self):
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
         client = FakeClient(US)
         agent = MiniAgent(client, api_mode="codex_responses")
         resp = interruptible_api_call(
@@ -171,6 +173,7 @@ class CompletionRouteTests(unittest.TestCase):
         self.assertEqual(client.create_calls, 1)
 
     def test_06_anthropic_mode_governed(self):
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
         client = FakeClient("https://api.anthropic.com")
         agent = MiniAgent(client, api_mode="anthropic_messages")
         agent._anthropic_base_url = "https://api.anthropic.com"
@@ -182,6 +185,7 @@ class CompletionRouteTests(unittest.TestCase):
         self.assertEqual(client.create_calls, 1)
 
     def test_07_universal_bytes_equal(self):
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
         client = FakeClient(US)
         agent = MiniAgent(client)
         body = {"model": "m", "messages": [{"role": "user", "content": "z"}], "temperature": 0}

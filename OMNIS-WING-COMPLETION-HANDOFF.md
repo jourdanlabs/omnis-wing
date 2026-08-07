@@ -1,6 +1,8 @@
 # OMNIS WING COMPLETION HANDOFF
 
 **Builder verdict: `READY_FOR_GATE`** (never self-CLEAR)  
+**HOLD repairs applied:** P0-A product default refuses without production signer (test signer opt-in only); P0-B real handler disables installed from primary WING imports; P1 handoff hygiene + real IT command.
+  
 **Builder:** Videl  
 **Independent gate:** Bulma  
 **Date:** 2026-08-07  
@@ -64,7 +66,7 @@ cd ~/projects/omnis-wing
 ./scripts/run_omnis_wing_v0_tests.sh
 ```
 
-Builder observation: **70 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_KEYCHAIN_IT=1`).
+Builder observation: **76 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_KEYCHAIN_IT=1`).
 
 ### Can-fail table (completion + retained spine)
 
@@ -79,6 +81,9 @@ Builder observation: **70 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_
 | Pre-send / terminal fsync fails | refuse / OUTCOME_UNKNOWN |
 | P-256 + Ed25519 algorithm bind | verify OK; mutation INVALID |
 | DISABLED route assert | WingRouteDisabled |
+| Product default no production signer | UnavailableSigner; REFUSE_POLICY_INVALID, client 0 |
+| Real side-door handlers (_handle_vision_analyze, text_to_speech_tool, …) | WingRouteDisabled |
+| Handoff hygiene planted marker | absent; real IT path present |
 | Manifest no outside/later | pass |
 | BBB digest | pass |
 | R1–R4.1 regression | green |
@@ -87,10 +92,11 @@ Builder observation: **70 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_
 
 ```sh
 OMNIS_WING_R4_KEYCHAIN_IT=1 python3.11 -m unittest \
-  tests.omnis_wing.FAKESECRET_a1b2c3d4e5f6g7h8i9j0 -v
+  tests.omnis_wing.test_r4_production_signer_health.R4ProductionSignerHealthTests.test_12_opt_in_real_keychain_if_enrolled -v
 ```
 
 Uses Captain tag read-only; no enroll/delete. `UNVERIFIED_AT_READ` honesty preserved.
+
 
 ## Operator workflow (no secrets)
 
