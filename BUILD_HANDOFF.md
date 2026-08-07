@@ -1,25 +1,26 @@
-# BUILD_HANDOFF — OMNIS WING R1 ABSOLUTE-shaped host slice
+# BUILD_HANDOFF — OMNIS WING R1.1 ABSOLUTE-shaped host slice
 
 **Final status: `READY_FOR_GATE`**
 
 Builder: Videl  
 Date: 2026-08-07  
 Repo: `~/projects/omnis-wing`  
-Prior gate: W0 ADMISSION PROTOTYPE CLEAR @ `a9baf33a`; TERMINUS ABSOLUTE HOST was HOLD (H1–H5)
+Prior: R1 @ `10a97a214f` strong seam, **HOLD H6** (empty `path_class` permitted)
 
-This is **not** full TERMINUS ABSOLUTE certification. It is the next provable host slice Bulma ordered.
+## R1.1 statement
+
+H6 closed. Destination completeness now requires non-empty, strip-normalized `path_class`. Empty / whitespace-only endpoint class → `REFUSE_DESTINATION`, `phase=NONE`, broker calls `0`. Destination-mutation control unchanged. Scope not expanded. Live Hermes not touched.
+
+This is still **not** full TERMINUS ABSOLUTE certification.
 
 ---
 
-## 1. CADMUS authority (R1)
+## 1. CADMUS authority (R1 — unchanged)
 
 | Field | Value |
 |---|---|
 | Path | `omnis_wing/spec/omnis-wing-r1-absolute.cadmus-input.json` |
 | SHA-256 | `b4dcb959ddda7a0ac488817e65fed255a31da6e077c20596d90d62fe0e121805` |
-| Scope bind | ABSOLUTE-shaped R1 seam only — does not imply full ABSOLUTE certification |
-
-W0 authority `b92d45d7…` remains historical for the admission prototype.
 
 ---
 
@@ -30,38 +31,19 @@ W0 authority `b92d45d7…` remains historical for the admission prototype.
 | Upstream | `https://github.com/NousResearch/Hermes-Agent.git` |
 | Base commit | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` |
 | W0 intro fork_commit | `204a6a302af5e47d63de7e948e735f97a7d84e44` |
-| HEAD at handoff | *(gate: `git rev-parse HEAD`)* |
-| Live Hermes | **untouched** (`~/.hermes/hermes-agent` still dirty at base pin) |
+| R1 candidate (pre-H6) | `10a97a214f64e78c51543cdf1f918d42df978f57` |
+| HEAD at handoff | `7cce236286c64d1f7750a5c05eb7d99c7f23cf54` (plus handoff commit if present) |
+| Live Hermes | **untouched** |
 
 ---
 
-## 3. What R1 added
+## 3. R1.1 delta (files)
 
-| Path | Role |
+| Path | Change |
 |---|---|
-| `omnis_wing/absolute/envelope.py` | Immutable `OutboundEnvelope` + source provenance + destination |
-| `omnis_wing/absolute/scanner.py` | Deterministic local scan of **exact** payload bytes |
-| `omnis_wing/absolute/evaluator.py` | ABSOLUTE decisions + phase machine + `RecordingBroker` |
-| `omnis_wing/absolute/host.py` | Sole R1 host entry |
-| `omnis_wing/absolute/coverage.py` | Coverage manifest loader |
-| `omnis_wing/coverage/ai_egress_coverage_r1.json` | Honest governed vs outside_r1 map |
-| `omnis_wing/transport_guard.py` | Extended to all R1-governed modules |
-| `tests/omnis_wing/test_absolute_r1.py` | Required cold controls |
-| `scripts/run_omnis_wing_v0_tests.sh` | Runs W0 + R1 |
-
-### Decision grammar (H1)
-
-`PERMIT`, `REFUSE_RESIDENCY`, `REFUSE_SOURCE_POLICY`, `REFUSE_SECRET`, `REFUSE_SCANNER_FAILURE`, `REFUSE_DESTINATION`, `REFUSE_POLICY_INVALID`, `REFUSE_CROWN_JEWEL`
-
-### Phase grammar (separate)
-
-`AUTHORIZED` → `TRANSMISSION_STARTED` → `TRANSMISSION_COMPLETED`  
-Failures: `FAILED_AFTER_TRANSMISSION_STARTED`, `OUTCOME_UNKNOWN`  
-Refusals: `phase=NONE`, provider calls **0**
-
-### Envelope (H2)
-
-`envelope_id`, modality, lane, canonical `payload_bytes` + `payload_digest`, sources (classification, content digest, protected_root, crown_jewel, byte_range/whole_content), intended_destination (provider, scheme, hostname, port, path_class, residency), policy_version, coverage_class.
+| `omnis_wing/absolute/evaluator.py` | Require non-empty stripped `path_class` → else `REFUSE_DESTINATION` |
+| `tests/omnis_wing/test_absolute_r1.py` | `test_06b_empty_path_class_refuse_destination_zero_calls` (`''`, `'   '`, `'\t'`) |
+| `BUILD_HANDOFF.md` | This R1.1 statement |
 
 ---
 
@@ -72,66 +54,44 @@ cd ~/projects/omnis-wing
 ./scripts/run_omnis_wing_v0_tests.sh
 ```
 
-Builder observation: **18/18 OK** (8 W0 + 10 R1).
+Builder observation: **19/19 OK** (8 W0 + 11 R1/R1.1).
 
 | Control | Observed |
 |---|---|
 | protected project → CN | `REFUSE_RESIDENCY`; stub 0 |
 | missing/invalid provenance | `REFUSE_SOURCE_POLICY`; stub 0 |
-| planted secret in payload | `REFUSE_SECRET`; no cleartext/bare-sha in receipt; stub 0 |
-| injected scanner failure | `REFUSE_SCANNER_FAILURE`; stub 0 |
-| allowed generic | evaluated bytes == broker bytes; phases reach `TRANSMISSION_COMPLETED` after stub return |
-| destination mutation after auth | `REFUSE_DESTINATION`; stub 0 |
-| planted direct `httpx` import | governed-module guard fails |
-| coverage manifest | all governed R1 modules listed+present; inherited Hermes transport `outside_r1`/`inbound`/`ungoverned`; `claims_whole_tree_ai_egress=false` |
+| planted secret | `REFUSE_SECRET`; no cleartext/bare-sha; stub 0 |
+| scanner failure | `REFUSE_SCANNER_FAILURE`; stub 0 |
+| allowed generic | bytes equal; `AUTHORIZED→STARTED→COMPLETED` |
+| destination mutation | `REFUSE_DESTINATION`; stub 0 |
+| **empty/blank path_class (H6)** | **`REFUSE_DESTINATION`; phase NONE; stub 0** |
+| planted `httpx` | guard fails |
+| coverage manifest | honest; whole-tree false |
 
 ---
 
-## 5. Scope map / glass
+## 5. Non-claims (unchanged, blunt)
 
-Active boundary string for R1:
-
-- `AI EGRESS GOVERNED (R1 seam only)`
-- Also true: `WORKSTATION EGRESS NOT GOVERNED`
-- IDE-owned egress: not claimed
-
-Inherited Hermes tree still contains many HTTP/provider imports (**not** auto-defects). Manifest labels them outside R1. No “sole outbound entry for the whole fork” claim.
-
----
-
-## 6. Non-claims (blunt)
-
-- **Not** TERMINUS ABSOLUTE complete / certified host.  
-- **Not** receipt signing, hash chain, or external anchor (H5 still open).  
-- **Not** full source-taint propagation through tool graphs / crown-jewel product corpus beyond R1 flags.  
-- **Not** fork-wide AI egress coverage (669 imports remain unclassified).  
-- **Not** live Hermes/Videl wiring, real providers, credentials, package, push.  
-- **Not** workstation DLP.  
-- W0 `SENT` grammar remains historical on the admission prototype path; R1 path does not use `SENT` as a decision.
+- Not TERMINUS ABSOLUTE complete.  
+- Not receipt signing/chain/anchor (H5).  
+- Not full source-taint propagation.  
+- Not full inherited-Hermes AI-egress classification.  
+- Not live Hermes/Videl wiring, real providers, package, push.  
+- Not workstation DLP / all modalities.
 
 ---
 
-## 7. Gate re-run
+## 6. Gate re-run
 
 ```sh
 cd ~/projects/omnis-wing
 git status --short
 git rev-parse HEAD
-git merge-base --is-ancestor 2213ea9fa73ab06cf667c1bfb1e99c8de3541589 HEAD && echo base_ok
 ./scripts/run_omnis_wing_v0_tests.sh
-# optional
-python3 - <<'PY'
-from pathlib import Path
-from hashlib import sha256
-p=Path('omnis_wing/spec/omnis-wing-r1-absolute.cadmus-input.json')
-t=p.read_text(encoding='utf-8').replace('\r\n','\n').replace('\r','\n')
-if t.startswith('\ufeff'): t=t[1:]
-print(sha256(t.encode()).hexdigest())
-PY
-# expect b4dcb959ddda7a0ac488817e65fed255a31da6e077c20596d90d62fe0e121805
+# expect 19/19 OK including test_06b_empty_path_class_refuse_destination_zero_calls
 ```
 
-**READY_FOR_GATE** for R1 ABSOLUTE-shaped slice only.
+**READY_FOR_GATE** for R1.1 destination-binding repair only.
 
 🫡 + 🔑  
 — Videl
