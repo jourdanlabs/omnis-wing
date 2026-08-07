@@ -79,11 +79,17 @@ def resolve_evidence_session(agent=None) -> EvidenceSession:
 
     if agent is not None:
         from omnis_wing.absolute.runtime_attach import ensure_agent_production_runtime
+        from omnis_wing.absolute.production_config import signer_mode
 
         ensure_agent_production_runtime(agent)
+        # Production: session always comes from attach (config-owned). Never keep a
+        # pre-planted agent session/path that bypassed attach.
         existing = getattr(agent, "wing_evidence_session", None)
         if existing is not None:
             return existing
+        if signer_mode() == "production":
+            # attach failed to set session — fail closed
+            return EvidenceSession(signer=UnavailableSigner(), ledger=EvidenceLedger(_default_ledger_path()))
         signer = getattr(agent, "wing_production_signer", None)
         if signer is not None:
             ledger = EvidenceLedger(

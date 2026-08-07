@@ -278,37 +278,161 @@ class ProductionCutoverTests(unittest.TestCase):
         agent = MiniAgent(client)
         attach_wing_runtime(agent, force=True)
 
-        # Break ledger append after first success by making path a directory mid-flight is hard;
-        # use fail_sign on backend for terminal — actually sign happens twice.
-        # Flip fail_sign after pre-send by wrapping ledger
         from omnis_wing.absolute.hermes_chat_join import OutcomeUnknownError
+        from omnis_wing.absolute.receipt_spine import EvidenceLedger
 
-        orig = agent.wing_evidence_session.ledger.append
+        # Class-level inject — production re-attach replaces instance ledger
         calls = {"n": 0}
+        orig = EvidenceLedger._durable_fsync
 
-        def flaky(sr):
+        def flaky(self, f):
             calls["n"] += 1
             if calls["n"] >= 2:
                 raise OSError("fsync_fail_sim")
-            return orig(sr)
+            return orig(self, f)
 
-        agent.wing_evidence_session.ledger.append = flaky  # type: ignore
-        with self.assertRaises(Exception) as cm:
+        EvidenceLedger._durable_fsync = flaky  # type: ignore
+        try:
+            with self.assertRaises(Exception) as cm:
+                interruptible_api_call(
+                    agent,
+                    {"model": "m", "messages": [{"role": "user", "content": "hi"}], "temperature": 0},
+                )
+            self.assertEqual(client.create_calls, 1)
+            ex = cm.exception
+            self.assertTrue(
+                isinstance(ex, OutcomeUnknownError)
+                or "OUTCOME_UNKNOWN" in type(ex).__name__
+                or "OUTCOME_UNKNOWN" in str(ex)
+                or "fsync" in str(ex).lower()
+                or type(ex).__name__ in ("OutcomeUnknownError", "EvidencePersistError"),
+                msg=type(ex).__name__ + ":" + str(ex),
+            )
+        finally:
+            EvidenceLedger._durable_fsync = orig  # type: ignore
+
+
+    def test_07_preexisting_0755_ledger_dir_refuse(self):
+        """Preexisting 0755 ledger directory => refuse, client 0. No chmod repair."""
+        import stat as stmod
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "production"
+        led_root = self.td / "open_led"
+        led_root.mkdir(mode=0o755)
+        # force mode (honor umask)
+        os.chmod(led_root, 0o755)
+        self.assertEqual(stmod.S_IMODE(led_root.stat().st_mode), 0o755)
+        work = self.td / "p256_o"; work.mkdir()
+        os.environ["OMNIS_WING_P256_WORK_DIR"] = str(work)
+        from omnis_wing.absolute.production_signer import DisposableP256Backend
+        DisposableP256Backend(tag=TEST_P256_TAG, work_dir=work).enroll()
+        cfg = _write_cfg(
+            self.td,
+            backend="disposable_p256",
+            tag=TEST_P256_TAG,
+            ledger_dir=str(led_root),
+            auto_enroll=False,
+        )
+        os.environ["OMNIS_WING_PRODUCTION_CONFIG"] = str(cfg)
+        client = FakeClient()
+        agent = MiniAgent(client)
+        st = attach_wing_runtime(agent, force=True)
+        self.assertFalse(st.get("ready"))
+        self.assertIn("ledger_security", st)
+        # mode unchanged (no chmod repair)
+        self.assertEqual(stmod.S_IMODE(led_root.stat().st_mode), 0o755)
+        with self.assertRaises(WingRefusal) as cm:
             interruptible_api_call(
                 agent,
                 {"model": "m", "messages": [{"role": "user", "content": "hi"}], "temperature": 0},
             )
-        self.assertEqual(client.create_calls, 1)
-        ex = cm.exception
-        self.assertTrue(
-            isinstance(ex, OutcomeUnknownError)
-            or "OUTCOME_UNKNOWN" in type(ex).__name__
-            or getattr(getattr(ex, "receipt", None), "phase", "") in ("OUTCOME_UNKNOWN", "UNKNOWN")
-            or "fsync" in str(ex).lower()
-            or "OUTCOME_UNKNOWN" in str(ex)
-            or type(ex).__name__ == "OutcomeUnknownError",
-            msg=type(ex).__name__ + ":" + str(ex),
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_POLICY_INVALID")
+        self.assertEqual(client.create_calls, 0)
+
+    def test_08_symlink_ledger_refuse(self):
+        """Symlinked ledger/root => refuse, client 0."""
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "production"
+        real = self.td / "real_led"
+        real.mkdir(mode=0o700)
+        os.chmod(real, 0o700)
+        link = self.td / "link_led"
+        link.symlink_to(real)
+        work = self.td / "p256_s"; work.mkdir()
+        os.environ["OMNIS_WING_P256_WORK_DIR"] = str(work)
+        from omnis_wing.absolute.production_signer import DisposableP256Backend
+        DisposableP256Backend(tag=TEST_P256_TAG, work_dir=work).enroll()
+        cfg = _write_cfg(
+            self.td,
+            backend="disposable_p256",
+            tag=TEST_P256_TAG,
+            ledger_dir=str(link),
+            auto_enroll=False,
         )
+        os.environ["OMNIS_WING_PRODUCTION_CONFIG"] = str(cfg)
+        client = FakeClient()
+        agent = MiniAgent(client)
+        st = attach_wing_runtime(agent, force=True)
+        self.assertFalse(st.get("ready"))
+        with self.assertRaises(WingRefusal):
+            interruptible_api_call(
+                agent,
+                {"model": "m", "messages": [{"role": "user", "content": "hi"}], "temperature": 0},
+            )
+        self.assertEqual(client.create_calls, 0)
+
+    def test_09_fresh_production_ledger_private_modes(self):
+        """Fresh configured production ledger => 0700 dirs / 0600 file."""
+        import stat as stmod
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "production"
+        led_root = self.td / "priv_led"
+        work = self.td / "p256_p"; work.mkdir()
+        os.environ["OMNIS_WING_P256_WORK_DIR"] = str(work)
+        from omnis_wing.absolute.production_signer import DisposableP256Backend
+        DisposableP256Backend(tag=TEST_P256_TAG, work_dir=work).enroll()
+        cfg = _write_cfg(
+            self.td,
+            backend="disposable_p256",
+            tag=TEST_P256_TAG,
+            ledger_dir=str(led_root),
+            auto_enroll=False,
+        )
+        os.environ["OMNIS_WING_PRODUCTION_CONFIG"] = str(cfg)
+        agent = MiniAgent(FakeClient())
+        st = attach_wing_runtime(agent, force=True)
+        self.assertTrue(st.get("ready"), st)
+        lp = Path(agent.wing_ledger_path)
+        self.assertTrue(lp.is_file())
+        self.assertFalse(lp.is_symlink())
+        self.assertEqual(stmod.S_IMODE(lp.stat().st_mode), 0o600)
+        self.assertEqual(stmod.S_IMODE(lp.parent.stat().st_mode), 0o700)
+        self.assertFalse(lp.parent.is_symlink())
+
+    def test_10_planted_test_session_production_refuse(self):
+        """Planted ready test session + wing_runtime_attached in production => refuse."""
+        from omnis_wing.absolute.receipt_spine import make_test_signer, EvidenceLedger
+        from omnis_wing.absolute.hermes_chat_join import EvidenceSession
+
+        os.environ["OMNIS_WING_SIGNER_MODE"] = "production"
+        # no production config
+        os.environ.pop("OMNIS_WING_PRODUCTION_CONFIG", None)
+        client = FakeClient()
+        agent = MiniAgent(client)
+        fake_led = self.td / "planted.jsonl"
+        fake_led.write_text("")
+        plant_signer = make_test_signer()
+        agent.wing_runtime_attached = True
+        agent.wing_ledger_path = str(fake_led)
+        agent.wing_production_signer = plant_signer
+        agent.wing_evidence_session = EvidenceSession(
+            signer=plant_signer, ledger=EvidenceLedger(fake_led)
+        )
+        agent.wing_runtime_status = {"ready": True, "backend": "planted_test"}
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(
+                agent,
+                {"model": "m", "messages": [{"role": "user", "content": "hi"}], "temperature": 0},
+            )
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_POLICY_INVALID")
+        self.assertEqual(client.create_calls, 0)
 
 
 if __name__ == "__main__":

@@ -277,11 +277,23 @@ class LedgerEntry:
 class EvidenceLedger:
     """Append-only JSONL ledger with sequence/previous-digest chain checks."""
 
-    def __init__(self, path: Path):
-        self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.path.exists():
-            self.path.write_text("", encoding="utf-8")
+    def __init__(self, path: Path, *, require_private: bool = False):
+        self.path = Path(path)
+        self.require_private = require_private
+        if require_private:
+            from omnis_wing.absolute.ledger_security import (
+                LedgerSecurityError,
+                prepare_private_ledger_file,
+            )
+
+            try:
+                self.path = prepare_private_ledger_file(self.path)
+            except LedgerSecurityError:
+                raise
+        else:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            if not self.path.exists():
+                self.path.write_text("", encoding="utf-8")
 
     def load_entries(self) -> list[dict]:
         lines = self.path.read_text(encoding="utf-8").splitlines()
@@ -324,8 +336,21 @@ class EvidenceLedger:
         """
         if getattr(self, "_force_unappendable", False):
             raise EvidencePersistError("ledger_not_appendable:forced")
+        if getattr(self, "require_private", False):
+            from omnis_wing.absolute.ledger_security import (
+                LedgerSecurityError,
+                assert_lineage_safe,
+                inspect_path_component,
+            )
+
+            try:
+                assert_lineage_safe(self.path)
+                inspect_path_component(self.path)
+            except LedgerSecurityError as exc:
+                raise EvidencePersistError(f"ledger_not_private:{exc}") from exc
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
+            if not getattr(self, "require_private", False):
+                self.path.parent.mkdir(parents=True, exist_ok=True)
             # Do not bump the real append fsync counter here — probe only.
             with self.path.open("a", encoding="utf-8") as f:
                 f.flush()

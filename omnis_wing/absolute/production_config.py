@@ -44,7 +44,12 @@ class ProductionConfigError(RuntimeError):
 
 
 def _expand(p: str) -> Path:
-    return Path(p).expanduser().resolve()
+    """Absolute path without following symlinks (resolve would hide symlink attacks)."""
+    path = Path(p).expanduser()
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    # Normalize . and .. without following symlinks
+    return Path(os.path.normpath(str(path)))
 
 
 def _simple_yaml_map(text: str) -> dict:
@@ -116,15 +121,18 @@ def load_production_config(
             raise ProductionConfigError(f"config_not_found:{p}")
         data = _load_mapping(p)
         source = str(p)
-        # Env overrides file for operator convenience (still explicit)
+        # File is authoritative for ledger_dir (explicit operator config).
+        # Optional overlays only for backend/tag/bridge when explicitly set —
+        # never silently replace ledger_dir from a ambient dogfood env var.
         if os.environ.get("OMNIS_WING_SIGNER_BACKEND"):
             data["backend"] = os.environ["OMNIS_WING_SIGNER_BACKEND"]
         if os.environ.get("OMNIS_WING_SIGNER_TAG"):
             data["tag"] = os.environ["OMNIS_WING_SIGNER_TAG"]
-        if os.environ.get("OMNIS_WING_LEDGER_DIR"):
-            data["ledger_dir"] = os.environ["OMNIS_WING_LEDGER_DIR"]
         if os.environ.get("OMNIS_WING_BRIDGE_PATH"):
             data["bridge_path"] = os.environ["OMNIS_WING_BRIDGE_PATH"]
+        # ledger_dir overlay only via OMNIS_WING_LEDGER_DIR_OVERRIDE (explicit)
+        if os.environ.get("OMNIS_WING_LEDGER_DIR_OVERRIDE"):
+            data["ledger_dir"] = os.environ["OMNIS_WING_LEDGER_DIR_OVERRIDE"]
 
     backend = str(data.get("backend") or "").strip().lower()
     if backend not in ("keychain", "disposable_p256", "none"):
