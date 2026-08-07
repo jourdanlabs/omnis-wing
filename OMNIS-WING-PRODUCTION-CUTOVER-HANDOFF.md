@@ -11,7 +11,7 @@
 | Item | Value |
 |---|---|
 | Branch | `omnis-wing/v0-admission` |
-| Tip | *(see git rev-parse HEAD at gate)* |
+| Tip | 9608a6851fc7f674a10c4c2ee7c7849b27d94811 |
 | Completion CLEAR (prior) | `b25eecbea7e0b45bcecc69d6ee8ce69ebe8f4399` |
 | Live Hermes (untouched) | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` |
 | Captain Keychain tag | `ai.jourdanlabs.omnis-wing.terminus.r4` |
