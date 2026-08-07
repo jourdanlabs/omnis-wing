@@ -12,7 +12,7 @@
 | Completion BBB | `omnis_wing/spec/OMNIS-WING-COMPLETION-BBB.md` |
 | BBB SHA-256 | `b1326dc57f4dde5922406e2033d14b0487dc387ab791e9fdecd3282907ad0bd6` |
 | Start pin | `89ccebae7922cab0645ecb4e8d145eb5d8a469c5` (R4.1 CLEAR) |
-| Final commit | `3bc8a3a9963a1f3b3ecbceea51507ebb06440a59` |
+| Final commit | `70f321c7f705965f1e6494f62fe49e33aba4e754` |
 
 ## Captain outcome (plain English)
 
