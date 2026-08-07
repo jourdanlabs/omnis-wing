@@ -12,7 +12,8 @@
 | Completion BBB | `omnis_wing/spec/OMNIS-WING-COMPLETION-BBB.md` |
 | BBB SHA-256 | `b1326dc57f4dde5922406e2033d14b0487dc387ab791e9fdecd3282907ad0bd6` |
 | Start pin | `89ccebae7922cab0645ecb4e8d145eb5d8a469c5` (R4.1 CLEAR) |
-| Final commit | `70f321c7f705965f1e6494f62fe49e33aba4e754` |
+| Feature ship commit | `a8cd6c89e940bf2158d0ed3a73c1b0e1f97cdf7a` |
+| Repo tip at handoff | run `git rev-parse HEAD` on branch `omnis-wing/v0-admission` |
 
 ## Captain outcome (plain English)
 
