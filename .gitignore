@@ -138,3 +138,4 @@ RELEASE_v*.md
 # walkthroughs). Throwaway artifacts, never part of the app.
 apps/desktop/demo/
 .omnis-wing-build/
+.omnis-wing-r4-gate-build/
