@@ -168,6 +168,73 @@ class MacOSKeychainBackend:
         return bool(out.get("valid"))
 
 
+
+
+@dataclass
+class DisposableP256Backend:
+    """Cold-test P-256 backend via openssl — NOT Keychain, NOT Captain tag.
+
+    Proves ecdsa-p256-x962-sha256 receipts verify end-to-end without touching
+    the production Keychain identity.
+    """
+
+    tag: str
+    work_dir: Path
+    enrolled: bool = False
+    fail_sign: bool = False
+    _priv: Path | None = field(default=None, repr=False)
+    _raw_pub: bytes | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.tag.startswith(TAG_PREFIX):
+            raise ValueError("invalid_application_tag")
+        if self.tag == CAPTAIN_R4_TAG:
+            raise ValueError("refusing_captain_production_tag_in_test_backend")
+        self.work_dir = Path(self.work_dir)
+        self.work_dir.mkdir(parents=True, exist_ok=True)
+
+    def status(self) -> dict:
+        if not self.enrolled or self._raw_pub is None:
+            return {"ready": False, "state": "NOT_ENROLLED", "tag": self.tag}
+        return {
+            "ready": True,
+            "state": "ENROLLED",
+            "tag": self.tag,
+            "key_type": "P-256",
+            "storage_state": "TEST_DISPOSABLE_OPENSSL",
+            "public_key_sha256": sha256(self._raw_pub).hexdigest(),
+            "backend": "disposable_p256_openssl",
+        }
+
+    def enroll(self) -> dict:
+        from omnis_wing.absolute.p256_crypto import generate_keypair_pem
+
+        priv, _pub, raw = generate_keypair_pem(self.work_dir)
+        self._priv = priv
+        self._raw_pub = raw
+        self.enrolled = True
+        return self.status()
+
+    def public_key_bytes(self) -> bytes:
+        if not self.enrolled or self._raw_pub is None:
+            raise SignerUnavailable("not_enrolled")
+        return self._raw_pub
+
+    def sign(self, message: bytes) -> bytes:
+        if not self.enrolled or self._priv is None:
+            raise SignerUnavailable("not_enrolled")
+        if self.fail_sign:
+            raise RuntimeError("disposable_p256_sign_failed")
+        from omnis_wing.absolute.p256_crypto import sign_message
+
+        return sign_message(self._priv, message)
+
+    def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
+        from omnis_wing.absolute.p256_crypto import verify_message
+
+        return verify_message(public_key, message, signature)
+
+
 @dataclass
 class ProductionSignerAdapter:
     """Signer protocol adapter over a backend. Startup-safe: no enroll in __init__."""
@@ -182,7 +249,7 @@ class ProductionSignerAdapter:
             self.key_id = f"wing-r4:{tag}"
         if isinstance(self.backend, DisposableTestBackend):
             self.signature_algorithm = "ed25519-test"
-        elif isinstance(self.backend, MacOSKeychainBackend):
+        elif isinstance(self.backend, (MacOSKeychainBackend, DisposableP256Backend)):
             self.signature_algorithm = "ecdsa-p256-x962-sha256"
 
     def available(self) -> bool:

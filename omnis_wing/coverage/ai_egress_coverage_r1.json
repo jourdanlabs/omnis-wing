@@ -146,12 +146,22 @@
       "path": "omnis_wing/absolute/omnis_wing_keychain.swift",
       "status": "governed_r4",
       "role": "macOS Security bridge source (operator compile)"
+    },
+    {
+      "path": "omnis_wing/absolute/p256_crypto.py",
+      "status": "governed_r4",
+      "role": "P-256 ECDSA verify/sign via openssl for algorithm dispatch + disposable fixture"
     }
   ],
   "r4_notes": {
     "production_enrollment": "explicit operator only; never on startup",
     "captain_tag": "ai.jourdanlabs.omnis-wing.terminus.r4 \u2014 tests must not touch",
     "storage_honesty": "UNVERIFIED_AT_READ / TEST_DISPOSABLE \u2014 never invent hardware_backed=true",
-    "remote_anchor": "NOT_CONFIGURED unless local fixture explicitly passed"
+    "remote_anchor": "NOT_CONFIGURED unless local fixture explicitly passed",
+    "signature_algorithms": [
+      "ed25519-test",
+      "ecdsa-p256-x962-sha256"
+    ],
+    "algorithm_bound_in_receipt": true
   }
 }

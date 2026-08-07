@@ -44,6 +44,7 @@ class Ed25519TestSigner:
 
     seed: bytes
     key_id: str = "test-ed25519-r3-v1"
+    signature_algorithm: str = "ed25519-test"
     _pk: bytes = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -106,6 +107,7 @@ class SignedEvidenceReceipt:
     previous_digest: str
     sequence: int
     key_id: str
+    signature_algorithm: str
     receipt_digest: str
     signature_hex: str
 
@@ -124,6 +126,7 @@ class SignedEvidenceReceipt:
             "previous_digest": self.previous_digest,
             "sequence": self.sequence,
             "key_id": self.key_id,
+            "signature_algorithm": self.signature_algorithm,
         }
 
     def to_dict(self) -> dict:
@@ -149,6 +152,7 @@ def build_signed_receipt(
     dest = dict(tr.destination or {})
     provider = str(dest.get("provider") or "")
     residency = str(dest.get("residency") or "")
+    algo = getattr(signer, "signature_algorithm", None) or "ed25519-test"
     body = {
         "schema": "omnis-wing.evidence-receipt.v1",
         "envelope_digest": tr.envelope_digest,
@@ -163,6 +167,7 @@ def build_signed_receipt(
         "previous_digest": previous_digest,
         "sequence": sequence,
         "key_id": signer.key_id,
+        "signature_algorithm": algo,
     }
     unsigned = _stable(body)
     receipt_digest = sha256(unsigned).hexdigest()
@@ -187,18 +192,44 @@ def build_signed_receipt(
         previous_digest=previous_digest,
         sequence=sequence,
         key_id=body["key_id"],
+        signature_algorithm=algo,
         receipt_digest=receipt_digest,
         signature_hex=sig.hex(),
     )
 
 
-def verify_signed_receipt(receipt: SignedEvidenceReceipt | dict, public_key: bytes) -> bool:
+def verify_signature_for_algorithm(
+    algorithm: str,
+    message: bytes,
+    signature: bytes,
+    public_key: bytes,
+) -> bool:
+    """Dispatch by algorithm bound in the receipt. Unknown → fail closed."""
+    algo = (algorithm or "").strip()
+    if algo in ("ed25519-test", "ed25519", "ed25519-r3"):
+        return ed25519.verify(message, signature, public_key)
+    if algo == "ecdsa-p256-x962-sha256":
+        from omnis_wing.absolute.p256_crypto import verify_message
+
+        return verify_message(public_key, message, signature)
+    return False
+
+
+def verify_signed_receipt(
+    receipt: SignedEvidenceReceipt | dict,
+    public_key: bytes,
+    *,
+    verify_fn=None,
+) -> bool:
+    """Verify receipt digest binding + signature. Algorithm is inside signed body."""
     if isinstance(receipt, SignedEvidenceReceipt):
         d = receipt.to_dict()
     else:
         d = dict(receipt)
     sig_hex = d.get("signature_hex") or ""
     digest = d.get("receipt_digest") or ""
+    # Legacy R3 receipts without field: treat as ed25519-test only if digest matches that body shape.
+    algo = d.get("signature_algorithm")
     body = {
         "schema": d.get("schema"),
         "envelope_digest": d.get("envelope_digest"),
@@ -214,14 +245,28 @@ def verify_signed_receipt(receipt: SignedEvidenceReceipt | dict, public_key: byt
         "sequence": d.get("sequence"),
         "key_id": d.get("key_id"),
     }
+    if algo is not None:
+        body["signature_algorithm"] = algo
     unsigned = _stable(body)
     if sha256(unsigned).hexdigest() != digest:
-        return False
+        # try legacy body without algorithm field
+        if algo is None:
+            pass
+        else:
+            return False
+        if sha256(_stable({k: v for k, v in body.items() if k != "signature_algorithm"})).hexdigest() != digest:
+            return False
+        algo = "ed25519-test"
+    if not algo:
+        algo = "ed25519-test"
     try:
         sig = bytes.fromhex(sig_hex)
     except ValueError:
         return False
-    return ed25519.verify(digest.encode("ascii"), sig, public_key)
+    msg = digest.encode("ascii")
+    if verify_fn is not None:
+        return bool(verify_fn(msg, sig, public_key, algo))
+    return verify_signature_for_algorithm(algo, msg, sig, public_key)
 
 
 @dataclass
@@ -324,7 +369,13 @@ class EvidenceLedger:
                 pass
             raise EvidencePersistError(f"ledger_fsync_or_append_failed:{exc}") from exc
 
-    def verify_chain(self, public_key: bytes) -> tuple[bool, str]:
+    def verify_chain(
+        self,
+        public_key: bytes,
+        *,
+        verify_fn=None,
+    ) -> tuple[bool, str]:
+        """Verify sequence, prev-digest chain, and per-receipt algorithm signatures."""
         entries = self.load_entries()
         prev = GENESIS_PREV
         for i, e in enumerate(entries, start=1):
@@ -332,7 +383,7 @@ class EvidenceLedger:
                 return False, f"sequence_mismatch_at_{i}"
             if e.get("previous_digest") != prev:
                 return False, f"prev_digest_mismatch_at_{i}"
-            if not verify_signed_receipt(e, public_key):
+            if not verify_signed_receipt(e, public_key, verify_fn=verify_fn):
                 return False, f"signature_fail_at_{i}"
             prev = e["receipt_digest"]
         return True, "ok"
