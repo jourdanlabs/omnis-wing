@@ -1,3 +1,23 @@
+# STALE CANDIDATE BANNER — READ FIRST
+
+**DO NOT GATE:** `e480339cce90ee3697cebdc60db8767e88df3626`  
+That tip still has blanket side-door install + `_INSTALLED=True` on partial failure. Bulma HOLD on that SHA is correct **for that SHA only**.
+
+**GATE THIS TIP INSTEAD:** `a50dd1382fafe813ee52a4774ec0fbf191a7ba4b`  
+**P0-B mechanism commit:** `752559f326f74be9fc098ac2582d4f5a5352e3d0`  
+**Authority BBB:** `b1326dc57f4dde5922406e2033d14b0487dc387ab791e9fdecd3282907ad0bd6`
+
+On the gate tip:
+- joins call `ensure_side_doors_armed()` with **no** install `except: pass`
+- deny at `tools.registry.register` / `.dispatch`
+- `complete` only when every declared DISABLED route is ARMED/NAMED_OK
+- forced unresolved → `SideDoorArmingError`
+- fresh process without dep stubs → `FRESH_OK`
+- P0-A product default signer refuse preserved
+- Builder does **not** self-CLEAR
+
+---
+
 # OMNIS WING COMPLETION HANDOFF
 
 **Builder verdict: `READY_FOR_GATE`** (never self-CLEAR)  
@@ -16,7 +36,7 @@
 | Start pin | `89ccebae7922cab0645ecb4e8d145eb5d8a469c5` (R4.1 CLEAR) |
 | Feature ship commit | `a8cd6c89e940bf2158d0ed3a73c1b0e1f97cdf7a` |
 | P0-B mechanism commit | `752559f326f74be9fc098ac2582d4f5a5352e3d0` |
-| Repo tip at handoff | `cf7994e726c657d978c2633faf7707bf7386fc95` |
+| Repo tip at handoff | `a50dd1382fafe813ee52a4774ec0fbf191a7ba4b` |
 
 ## Captain outcome (plain English)
 
