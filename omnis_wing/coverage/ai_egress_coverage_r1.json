@@ -6,11 +6,11 @@
   "claims_absolute_complete": false,
   "claims_all_hermes_chat_paths": false,
   "glass": {
-    "active_boundary": "AI EGRESS GOVERNED (R1 seam + R2 single chat_completions join)",
+    "active_boundary": "AI EGRESS GOVERNED (R1 seam + R2.1 full-body chat_completions join + actual endpoint bind)",
     "also_true": [
-      "IDE-OWNED EGRESS GOVERNED — not claimed",
+      "IDE-OWNED EGRESS GOVERNED \u2014 not claimed",
       "WORKSTATION EGRESS NOT GOVERNED",
-      "Streaming / anthropic_messages / bedrock / codex_responses — outside_r2"
+      "Streaming / anthropic_messages / bedrock / codex_responses \u2014 outside_r2"
     ]
   },
   "governed_r1": [
@@ -54,7 +54,7 @@
     {
       "path": "omnis_wing/absolute/hermes_chat_join.py",
       "status": "governed_r2",
-      "role": "R2 sole join: messages → OutboundEnvelope → dispatch_outbound → client.create"
+      "role": "R2 sole join: messages \u2192 OutboundEnvelope \u2192 dispatch_outbound \u2192 client.create"
     },
     {
       "path": "agent/chat_completion_helpers.py",
@@ -101,7 +101,17 @@
   },
   "r2_outside_payload_equality": [
     "HTTP framing, TLS, Authorization headers",
-    "api_kwargs fields other than messages (model, temperature, tools, extra_body)",
-    "base_url path and provider SDK request assembly after broker delivers messages"
-  ]
+    "base_url path segments beyond host/port used for destination bind",
+    "provider SDK request assembly internals after broker delivers body kwargs"
+  ],
+  "r2_1_notes": {
+    "canonical_body": "entire chat.completions body fields allowlisted and scanned; unknown fields REFUSE_UNSUPPORTED",
+    "destination": "derived from client.base_url + HOSTNAME_POLICY; context cannot bless route",
+    "outside_still": [
+      "HTTP/TLS framing and auth headers",
+      "streaming / anthropic / bedrock / codex paths",
+      "retries/fallbacks as separate paths",
+      "whole Hermes tree"
+    ]
+  }
 }

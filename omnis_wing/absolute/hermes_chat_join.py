@@ -1,29 +1,30 @@
-"""R2 join: ordinary Hermes non-streaming chat.completions → WING R1.1 boundary.
+"""R2.1 join: ordinary Hermes non-streaming chat.completions → WING boundary.
 
-Selected production path (documented in BUILD_HANDOFF):
+Selected production path:
   AIAgent._interruptible_api_call
     → agent.chat_completion_helpers.interruptible_api_call
-      → _call() [api_mode default / chat_completions]
-        → omnis_wing.absolute.hermes_chat_join.governed_chat_completions_create
-          → OutboundEnvelope(payload_bytes = canonical messages JSON)
-          → decide_and_execute / dispatch_outbound
-          → injected client.chat.completions.create ONLY via broker.transmit
+      → _call() [chat_completions]
+        → governed_chat_completions_create
+          → canonical provider-request BODY (all forwarded fields)
+          → OutboundEnvelope.payload_bytes
+          → dispatch_outbound
+          → broker reconstructs create(**body) from evaluated bytes only
+          → destination derived from actual client.base_url + policy map
 
-Outside R2 (not claimed equal to envelope bytes):
-  - provider SDK HTTP framing, auth headers, base_url path
-  - model / temperature / tools / extra_body fields on api_kwargs
-    (messages alone are the envelope payload; other kwargs ride along
-     after PERMIT and are labelled outside payload equality)
+P0-A closed: no unscanned api_kwargs ride-along.
+P0-B closed: context cannot bless a route; actual endpoint binds authorization.
+
+Outside claim (still):
+  HTTP/TLS framing, auth headers, SDK transport internals — not body fields.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
 
 from omnis_wing.absolute.envelope import (
-    COVERAGE_CLASS,
     POLICY_VERSION,
     IntendedDestination,
     OutboundEnvelope,
@@ -33,19 +34,54 @@ from omnis_wing.absolute.evaluator import (
     Authorization,
     RecordingBroker,
     TransmissionReceipt,
-    decide_and_execute,
 )
 from omnis_wing.absolute.host import dispatch_outbound
 
-# R2 coverage class — seam is the chat join only
 R2_COVERAGE_CLASS = "AI_EGRESS_GOVERNED_R2_CHAT_COMPLETIONS_JOIN"
 R2_LANE = "hermes.chat_completions.non_stream"
 R2_POLICY_VERSION = POLICY_VERSION
+PATH_CLASS = "chat.completions"
+
+# Body fields this join may forward. Anything else → REFUSE_UNSUPPORTED.
+ALLOWED_BODY_KEYS = frozenset(
+    {
+        "messages",
+        "model",
+        "tools",
+        "tool_choice",
+        "response_format",
+        "extra_body",
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "max_completion_tokens",
+        "n",
+        "stop",
+        "stream",
+        "presence_penalty",
+        "frequency_penalty",
+        "logit_bias",
+        "user",
+        "seed",
+        "logprobs",
+        "top_logprobs",
+    }
+)
+
+# Controlled R2 policy map: hostname → (provider, residency). Not caller assertion.
+HOSTNAME_POLICY: dict[str, tuple[str, str]] = {
+    "ai.example.test": ("stub-local", "US"),
+    "api.openai.com": ("openai", "US"),
+    "api.x.ai": ("xai", "US"),
+    "api.fireworks.ai": ("fireworks", "US"),
+    "api.moonshot.cn": ("moonshot", "CN"),
+    "api.moonshot.ai": ("moonshot", "US"),
+    "localhost": ("local", "LOCAL"),
+    "127.0.0.1": ("local", "LOCAL"),
+}
 
 
 class WingRefusal(Exception):
-    """Raised when WING refuses before or without completed transmission."""
-
     def __init__(self, receipt: TransmissionReceipt):
         self.receipt = receipt
         super().__init__(
@@ -55,43 +91,182 @@ class WingRefusal(Exception):
 
 @dataclass
 class WingEgressContext:
-    """Explicit provenance + destination for the selected chat path."""
+    """Source provenance for the selected chat path.
+
+    Destination is NOT authoritative. Optional declared_destination, if present,
+    must exactly match the destination derived from the actual client endpoint.
+    """
 
     sources: tuple[SourceProvenance, ...]
-    destination: IntendedDestination
+    declared_destination: Optional[IntendedDestination] = None
     lane: str = R2_LANE
     policy_version: str = R2_POLICY_VERSION
     coverage_class: str = R2_COVERAGE_CLASS
 
+    # Back-compat alias used by older R2 tests/callers — treated as declared only.
+    @property
+    def destination(self) -> Optional[IntendedDestination]:
+        return self.declared_destination
 
-def canonical_messages_payload_bytes(messages: Any) -> bytes:
-    """Exact chat message bytes placed on the envelope and re-delivered to the client.
 
-    Message order preserved. Separators compact. UTF-8.
-    This is the R2 equality boundary — not the full HTTP request.
-    """
+def _json_default(obj: Any) -> Any:
+    raise TypeError(f"non_json_serializable:{type(obj).__name__}")
+
+
+def stable_json_bytes(obj: Any) -> bytes:
     return json.dumps(
-        messages,
+        obj,
         ensure_ascii=False,
         separators=(",", ":"),
+        sort_keys=True,
+        default=_json_default,
     ).encode("utf-8")
 
 
-class ChatCompletionsClientBroker(RecordingBroker):
-    """Broker that invokes the OpenAI-compatible client's create once with
-    messages decoded from the authorized envelope payload bytes.
+def canonical_provider_request_body(
+    api_kwargs: dict,
+) -> tuple[Optional[bytes], Optional[dict], Optional[str]]:
     """
+    Deterministic canonical representation of every outbound request-body field.
+    Returns (payload_bytes, body_dict, error_reason).
+    """
+    unknown = sorted(set(api_kwargs.keys()) - ALLOWED_BODY_KEYS)
+    if unknown:
+        return None, None, f"unsupported_body_fields:{','.join(unknown)}"
 
-    def __init__(self, client: Any, api_kwargs: dict):
+    if api_kwargs.get("stream") is True:
+        return None, None, "stream_true_not_on_non_stream_join"
+
+    body: dict[str, Any] = {}
+    for key in sorted(api_kwargs.keys()):
+        body[key] = api_kwargs[key]
+
+    # Ensure messages key exists (may be empty list)
+    if "messages" not in body:
+        body["messages"] = []
+
+    try:
+        payload = stable_json_bytes(body)
+    except TypeError as exc:
+        return None, None, str(exc)
+
+    return payload, body, None
+
+
+# Back-compat helper name used in older tests
+def canonical_messages_payload_bytes(messages: Any) -> bytes:
+    return stable_json_bytes(messages)
+
+
+def _extract_base_url(client: Any) -> str:
+    for attr in ("base_url", "api_base", "base_api"):
+        val = getattr(client, attr, None)
+        if val is not None and str(val).strip():
+            return str(val).strip().rstrip("/")
+    inner = getattr(client, "_client", None)
+    if inner is not None:
+        val = getattr(inner, "base_url", None)
+        if val is not None and str(val).strip():
+            return str(val).strip().rstrip("/")
+    return ""
+
+
+def _parse_endpoint(raw: str) -> tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
+    """Minimal URL parse without urllib (import-guard safe). Returns scheme, host, port, err."""
+    s = raw.strip()
+    if "://" not in s:
+        s = "https://" + s
+    try:
+        scheme, rest = s.split("://", 1)
+    except ValueError:
+        return None, None, None, "unparseable_client_base_url"
+    scheme = scheme.lower()
+    # drop path/query
+    hostport = rest.split("/", 1)[0]
+    hostport = hostport.split("?", 1)[0]
+    if not hostport:
+        return None, None, None, "unparseable_client_base_url"
+    if hostport.startswith("["):
+        # ipv6 not needed in R2.1 policy map
+        return None, None, None, "ipv6_not_supported_r21"
+    if ":" in hostport:
+        host, port_s = hostport.rsplit(":", 1)
+        try:
+            port = int(port_s)
+        except ValueError:
+            return None, None, None, "unparseable_port"
+    else:
+        host = hostport
+        port = 443 if scheme == "https" else 80
+    host = host.lower()
+    if not host or not scheme:
+        return None, None, None, "unparseable_client_base_url"
+    return scheme, host, port, None
+
+
+def derive_destination_from_client(client: Any) -> tuple[Optional[IntendedDestination], Optional[str]]:
+    """Derive scheme/host/port/path_class/provider/residency from actual client config."""
+    raw = _extract_base_url(client)
+    if not raw:
+        return None, "missing_client_base_url"
+
+    scheme, hostname, port, perr = _parse_endpoint(raw)
+    if perr or not scheme or not hostname or port is None:
+        return None, perr or "unparseable_client_base_url"
+
+    policy = HOSTNAME_POLICY.get(hostname)
+    if policy is None:
+        return None, f"hostname_not_in_r2_policy_map:{hostname}"
+
+    provider, residency = policy
+    dest = IntendedDestination(
+        provider=provider,
+        scheme=scheme,
+        hostname=hostname,
+        port=port,
+        path_class=PATH_CLASS,
+        residency=residency,
+    )
+    return dest, None
+
+
+def _refusal_receipt(
+    *,
+    decision: str,
+    reason: str,
+    envelope_id: str = "ungoverned",
+    envelope_digest: str = "",
+    payload_digest: str = "",
+    destination: Optional[dict] = None,
+    policy_version: str = R2_POLICY_VERSION,
+    coverage_class: str = R2_COVERAGE_CLASS,
+) -> TransmissionReceipt:
+    return TransmissionReceipt(
+        envelope_id=envelope_id,
+        envelope_digest=envelope_digest or ("0" * 64),
+        payload_digest=payload_digest or ("0" * 64),
+        decision=decision,  # type: ignore[arg-type]
+        phase="NONE",
+        reason=reason,
+        finding_ids=(),
+        provider_calls=0,
+        delivered_payload_digest=None,
+        destination=destination or {},
+        policy_version=policy_version,
+        coverage_class=coverage_class,
+        phases_observed=(),
+    )
+
+
+class ChatCompletionsClientBroker(RecordingBroker):
+    """Reconstructs create() solely from evaluated canonical body bytes."""
+
+    def __init__(self, client: Any):
         super().__init__()
         self.client = client
-        self.api_kwargs = dict(api_kwargs)
         self.response: Any = None
-        self.delivered_messages: Any = None
-        # Fields sent alongside messages but outside envelope equality claim
-        self.outside_r2_kwargs_keys: tuple[str, ...] = tuple(
-            sorted(k for k in api_kwargs.keys() if k != "messages")
-        )
+        self.delivered_body: Any = None
+        self.delivered_kwargs: dict = {}
 
     def transmit(self, envelope: OutboundEnvelope, authorization: Authorization) -> dict:
         if authorization.destination_binding != envelope.intended_destination.binding_tuple():
@@ -105,12 +280,13 @@ class ChatCompletionsClientBroker(RecordingBroker):
         self.last_payload = bytes(envelope.payload_bytes)
         self.last_destination = envelope.intended_destination.binding_tuple()
 
-        messages = json.loads(envelope.payload_bytes.decode("utf-8"))
-        self.delivered_messages = messages
-        kwargs = dict(self.api_kwargs)
-        kwargs["messages"] = messages
-        # Sole client invocation on this path
-        self.response = self.client.chat.completions.create(**kwargs)
+        body = json.loads(envelope.payload_bytes.decode("utf-8"))
+        if not isinstance(body, dict):
+            raise RuntimeError("canonical_body_not_object")
+        self.delivered_body = body
+        self.delivered_kwargs = dict(body)
+        # Sole client invocation — kwargs only from evaluated body
+        self.response = self.client.chat.completions.create(**self.delivered_kwargs)
         return {
             "ok": True,
             "stub": getattr(self.client, "is_fake", False),
@@ -122,42 +298,53 @@ class ChatCompletionsClientBroker(RecordingBroker):
 def build_envelope_for_chat(
     api_kwargs: dict,
     wing_ctx: Optional[WingEgressContext],
-) -> OutboundEnvelope:
-    messages = api_kwargs.get("messages")
-    if messages is None:
-        messages = []
-    payload = canonical_messages_payload_bytes(messages)
+    client: Any,
+) -> tuple[Optional[OutboundEnvelope], Optional[TransmissionReceipt]]:
+    """Build envelope or return a pre-broker refusal receipt."""
+    payload, _body, err = canonical_provider_request_body(api_kwargs)
+    if err is not None:
+        return None, _refusal_receipt(decision="REFUSE_UNSUPPORTED", reason=err)
+
+    dest, derr = derive_destination_from_client(client)
+    if derr is not None or dest is None:
+        return None, _refusal_receipt(
+            decision="REFUSE_DESTINATION",
+            reason=derr or "destination_derive_failed",
+        )
 
     if wing_ctx is None:
-        # Missing context ⇒ missing provenance (must refuse)
         sources: tuple[SourceProvenance, ...] = ()
-        destination = IntendedDestination(
-            provider="unspecified",
-            scheme="https",
-            hostname="unspecified.invalid",
-            port=443,
-            path_class="chat.completions",
-            residency="US",
-        )
         lane = R2_LANE
         policy_version = R2_POLICY_VERSION
         coverage_class = R2_COVERAGE_CLASS
+        declared = None
     else:
         sources = tuple(wing_ctx.sources)
-        destination = wing_ctx.destination
         lane = wing_ctx.lane
         policy_version = wing_ctx.policy_version
         coverage_class = wing_ctx.coverage_class
+        declared = wing_ctx.declared_destination or wing_ctx.destination
 
-    return OutboundEnvelope.create(
+    if declared is not None and declared.binding_tuple() != dest.binding_tuple():
+        return None, _refusal_receipt(
+            decision="REFUSE_DESTINATION",
+            reason="declared_destination_mismatch_actual_client_endpoint",
+            destination=dest.to_dict(),
+            policy_version=policy_version,
+            coverage_class=coverage_class,
+        )
+
+    assert payload is not None
+    env = OutboundEnvelope.create(
         modality="chat",
         lane=lane,
         payload=payload,
         sources=sources,
-        destination=destination,
+        destination=dest,
         policy_version=policy_version,
         coverage_class=coverage_class,
     )
+    return env, None
 
 
 def governed_chat_completions_create(
@@ -167,21 +354,25 @@ def governed_chat_completions_create(
     *,
     broker: Optional[ChatCompletionsClientBroker] = None,
 ) -> Any:
-    """
-    Sole outbound join for the selected non-streaming chat_completions path.
-    Always runs dispatch_outbound before any client.chat.completions.create.
-    """
-    envelope = build_envelope_for_chat(api_kwargs, wing_ctx)
-    br = broker or ChatCompletionsClientBroker(client, api_kwargs)
+    """Sole outbound join for selected non-streaming chat_completions path."""
+    envelope, early = build_envelope_for_chat(api_kwargs, wing_ctx, client)
+    if early is not None:
+        raise WingRefusal(early)
+    assert envelope is not None
+
+    br = broker or ChatCompletionsClientBroker(client)
     receipt = dispatch_outbound(envelope, br)
     if receipt.decision != "PERMIT" or receipt.phase != "TRANSMISSION_COMPLETED":
         raise WingRefusal(receipt)
-    # Byte equality proof surface for tests
     if br.last_payload != envelope.payload_bytes:
         raise RuntimeError("delivered_payload_bytes_mismatch")
+    # Complete-request equality: client kwargs must match evaluated body
+    if br.delivered_kwargs is not None:
+        rebuilt = stable_json_bytes(br.delivered_kwargs)
+        if rebuilt != envelope.payload_bytes:
+            raise RuntimeError("delivered_body_canonical_mismatch")
     return br.response
 
 
 def resolve_wing_context(agent: Any) -> Optional[WingEgressContext]:
-    """Pull explicit context from the agent; None means missing provenance."""
     return getattr(agent, "wing_egress_context", None)

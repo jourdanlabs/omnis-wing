@@ -18,6 +18,7 @@ Decision = Literal[
     "REFUSE_DESTINATION",
     "REFUSE_POLICY_INVALID",
     "REFUSE_CROWN_JEWEL",
+    "REFUSE_UNSUPPORTED",
 ]
 
 Phase = Literal[
