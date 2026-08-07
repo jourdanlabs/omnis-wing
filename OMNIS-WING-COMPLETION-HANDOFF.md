@@ -10,9 +10,11 @@ That tip still has blanket side-door install + `_INSTALLED=True` on partial fail
 On the gate tip:
 - joins call `ensure_side_doors_armed()` with **no** install `except: pass`
 - deny at `tools.registry.register` / `.dispatch`
+- **`importlib.import_module` + `builtins.__import__` + `importlib.reload` wrapped** (product discovery path)
+- module DISABLED routes eagerly patched or deny-stubbed; ARMED only when entrypoints refuse — **hook presence alone is not coverage**
 - `complete` only when every declared DISABLED route is ARMED/NAMED_OK
 - forced unresolved → `SideDoorArmingError`
-- fresh process without dep stubs → `FRESH_OK`
+- fresh process importlib of every module DISABLED route → refuse before provider
 - P0-A product default signer refuse preserved
 - Builder does **not** self-CLEAR
 
@@ -21,7 +23,7 @@ On the gate tip:
 # OMNIS WING COMPLETION HANDOFF
 
 **Builder verdict: `READY_FOR_GATE`** (never self-CLEAR)  
-**HOLD repairs applied:** P0-A product default refuses without production signer (test signer opt-in only). P0-B side-door arming is fail-closed at `tools.registry` register/dispatch + import hook; `ensure_side_doors_armed()` raises `SideDoorArmingError` if any declared DISABLED route is unresolved; no blanket except-pass; incomplete install never reports complete. P1 handoff hygiene + real IT command. Fresh-process can-fails included.
+**HOLD repairs applied:** P0-A product default refuses without production signer (test signer opt-in only). P0-B side-door arming is fail-closed at `tools.registry` register/dispatch + **importlib.import_module** (not builtins-only); `ensure_side_doors_armed()` raises `SideDoorArmingError` if any declared DISABLED route is unresolved; no blanket except-pass; incomplete install never reports complete. P1 handoff hygiene + real IT command. Fresh-process can-fails included.
   
 **Builder:** Videl  
 **Independent gate:** Bulma  
@@ -87,7 +89,7 @@ cd ~/projects/omnis-wing
 ./scripts/run_omnis_wing_v0_tests.sh
 ```
 
-Builder observation: **80 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_KEYCHAIN_IT=1`).
+Builder observation: **82 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_KEYCHAIN_IT=1`).
 
 ### Can-fail table (completion + retained spine)
 

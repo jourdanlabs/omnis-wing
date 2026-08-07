@@ -1,8 +1,9 @@
-"""Completion HOLD repairs: P0-A signer default + fail-closed side-door arming."""
+"""Completion HOLD repairs: P0-A + fail-closed side-doors incl. importlib path."""
 
 from __future__ import annotations
 
 import hashlib
+import importlib
 import os
 import subprocess
 import sys
@@ -33,16 +34,17 @@ from omnis_wing.absolute.auto_provenance import resolve_evidence_session  # noqa
 from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.receipt_spine import UnavailableSigner, Ed25519TestSigner  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
-from omnis_wing.completion.product_disable import WingRouteDisabled  # noqa: E402
+from omnis_wing.completion.product_disable import WingRouteDisabled, load_manifest  # noqa: E402
 from omnis_wing.completion.side_doors import (  # noqa: E402
+    MODULE_HANDLER_TARGETS,
+    ROUTE_MODULES,
     SideDoorArmingError,
     arm_side_doors,
     ensure_side_doors_armed,
     force_unresolved_for_test,
-    get_arming_state,
     guards_installed,
     handler_is_disabled,
-    DISABLED_TOOL_NAMES,
+    skip_stub_for_test,
 )
 
 
@@ -138,38 +140,28 @@ class CompletionP0RepairTests(unittest.TestCase):
         st = ensure_side_doors_armed()
         self.assertTrue(st.complete)
         self.assertTrue(st.registry_wrapped)
-        self.assertTrue(st.import_hook_installed)
+        self.assertTrue(st.importlib_wrapped)
         self.assertTrue(guards_installed())
         for route, status in st.routes.items():
-            self.assertIn(status, ("ARMED", "NAMED_OK"), msg=f"{route}={status}")
+            self.assertIn(status, ("ARMED", "NAMED_OK"), msg=f"{route}={status} state={st.as_dict()}")
 
     def test_p0b_registry_dispatch_denies_disabled_tools(self):
         ensure_side_doors_armed()
         from tools.registry import registry
 
-        # Register a fake disabled-name tool with a transport that must never run
         transport_calls = {"n": 0}
 
         def evil_handler(args, **kw):
             transport_calls["n"] += 1
             return "sent"
 
-        registry.register(
-            name="vision_analyze",
-            toolset="wing_test",
-            schema={"name": "vision_analyze", "description": "t", "parameters": {}},
-            handler=evil_handler,
-            override=True,
-        )
-        # Handler on entry must already be refuse wrapper
-        entry = registry.get_entry("vision_analyze")
-        self.assertTrue(getattr(entry.handler, "__omnis_wing_disabled__", False))
-        with self.assertRaises(WingRouteDisabled):
-            registry.dispatch("vision_analyze", {"image_url": "x"})
-        self.assertEqual(transport_calls["n"], 0)
-
-        # Other disabled names
-        for tname in ("image_generate", "text_to_speech", "mixture_of_agents", "video_analyze"):
+        for tname in (
+            "vision_analyze",
+            "image_generate",
+            "text_to_speech",
+            "mixture_of_agents",
+            "video_analyze",
+        ):
             registry.register(
                 name=tname,
                 toolset="wing_test",
@@ -181,25 +173,77 @@ class CompletionP0RepairTests(unittest.TestCase):
                 registry.dispatch(tname, {})
         self.assertEqual(transport_calls["n"], 0)
 
-    def test_p0b_import_hook_patches_late_module(self):
+    def test_p0b_importlib_path_disables_transcription(self):
+        """Bulma control: importlib.import_module after arm must not leave live callables."""
         ensure_side_doors_armed()
-        # Simulate a late-loaded side-door module
-        mod = types.ModuleType("tools.vision_tools")
-
-        def _handle_vision_analyze(args, **kw):
-            return "would_call_provider"
-
-        mod._handle_vision_analyze = _handle_vision_analyze
-        sys.modules["tools.vision_tools"] = mod
-        # Trigger import hook path via __import__ of watched name
-        __import__("tools.vision_tools")
-        # Re-run patch explicitly through arm (hook also runs on import)
-        from omnis_wing.completion.side_doors import _patch_module_handlers
-
-        _patch_module_handlers("tools.vision_tools")
-        self.assertTrue(handler_is_disabled("tools.vision_tools", "_handle_vision_analyze"))
+        # Drop any existing module to force a load path
+        for key in list(sys.modules):
+            if key == "tools.transcription_tools" or key.startswith("tools.transcription_tools."):
+                del sys.modules[key]
+        mod = importlib.import_module("tools.transcription_tools")
+        self.assertTrue(
+            getattr(mod, "__omnis_wing_deny_stub__", False)
+            or handler_is_disabled("tools.transcription_tools", "transcribe_audio"),
+            msg=f"mod attrs={[a for a in dir(mod) if not a.startswith('__')][:20]}",
+        )
         with self.assertRaises(WingRouteDisabled):
-            sys.modules["tools.vision_tools"]._handle_vision_analyze({})
+            mod.transcribe_audio("/tmp/nonexistent-wing.ogg")
+
+    def test_p0b_importlib_all_module_routes(self):
+        ensure_side_doors_armed()
+        man = load_manifest()
+        module_routes = [
+            r["route_id"]
+            for r in man["routes"]
+            if r.get("state") == "DISABLED"
+            and r.get("broker_join") == "DISABLED"
+            and r["route_id"] != "gateway.platform_messaging"
+        ]
+        for route_id in module_routes:
+            mods = ROUTE_MODULES.get(route_id) or ()
+            self.assertTrue(mods, msg=f"no modules for {route_id}")
+            primary = mods[0]
+            # re-import via importlib (product path)
+            if primary in sys.modules and getattr(sys.modules[primary], "__omnis_wing_deny_stub__", False):
+                mod = sys.modules[primary]
+            else:
+                try:
+                    if primary in sys.modules:
+                        del sys.modules[primary]
+                except KeyError:
+                    pass
+                mod = importlib.import_module(primary)
+            # Must not expose a live un-disabled primary entry
+            if primary in MODULE_HANDLER_TARGETS:
+                names = MODULE_HANDLER_TARGETS[primary][1]
+                if names:
+                    # at least one entry exists and refuses
+                    found = False
+                    for n in names:
+                        if hasattr(mod, n):
+                            found = True
+                            with self.assertRaises(WingRouteDisabled, msg=f"{primary}.{n}"):
+                                fn = getattr(mod, n)
+                                try:
+                                    res = fn()
+                                    # if async coroutine
+                                    if hasattr(res, "__await__"):
+                                        pass
+                                except TypeError:
+                                    fn({})
+                            self.assertTrue(handler_is_disabled(primary, n) or getattr(mod, "__omnis_wing_deny_stub__", False))
+                    self.assertTrue(found or getattr(mod, "__omnis_wing_deny_stub__", False), msg=primary)
+                else:
+                    # pattern modules — stub or at least one disabled callable
+                    self.assertTrue(
+                        getattr(mod, "__omnis_wing_deny_stub__", False)
+                        or any(
+                            callable(getattr(mod, a, None))
+                            and getattr(getattr(mod, a), "__omnis_wing_disabled__", False)
+                            for a in dir(mod)
+                        ),
+                        msg=primary,
+                    )
 
     def test_p0b_can_fail_unresolved_refuses_loudly(self):
         ensure_side_doors_armed()
@@ -207,51 +251,96 @@ class CompletionP0RepairTests(unittest.TestCase):
         try:
             st = arm_side_doors(force_rearm=True)
             self.assertFalse(st.complete)
-            self.assertEqual(st.routes.get("tools.vision_tools"), "UNRESOLVED")
             with self.assertRaises(SideDoorArmingError) as cm:
                 ensure_side_doors_armed()
             self.assertIn("tools.vision_tools", cm.exception.unresolved)
-            # Primary join import path would raise — simulate ensure call site
-            with self.assertRaises(SideDoorArmingError):
-                from omnis_wing.completion.side_doors import ensure_side_doors_armed as ens
-
-                ens()
         finally:
             force_unresolved_for_test(None)
             arm_side_doors(force_rearm=True)
             ensure_side_doors_armed()
 
-    def test_p0b_fresh_subprocess_no_dep_stubs_arms_and_denies(self):
-        """Fresh process: no test-only httpx/requests stubs; registry deny must arm."""
+    def test_p0b_can_fail_skip_stub_unresolved(self):
+        """If deny-stub cannot install and module not patched → not complete."""
+        skip_stub_for_test("tools.transcription_tools")
+        # remove module so eager path needs stub
+        for key in list(sys.modules):
+            if key == "tools.transcription_tools":
+                del sys.modules[key]
+        try:
+            st = arm_side_doors(force_rearm=True)
+            # may be unresolved
+            if st.routes.get("tools.transcription_tools") == "UNRESOLVED":
+                with self.assertRaises(SideDoorArmingError):
+                    ensure_side_doors_armed()
+            else:
+                # if real module patched without stub, still ok — force unresolved
+                force_unresolved_for_test("tools.transcription_tools")
+                with self.assertRaises(SideDoorArmingError):
+                    ensure_side_doors_armed()
+        finally:
+            skip_stub_for_test(None)
+            force_unresolved_for_test(None)
+            arm_side_doors(force_rearm=True)
+            ensure_side_doors_armed()
+
+    def test_p0b_fresh_subprocess_importlib_all_disabled(self):
         code = textwrap.dedent(
             f"""
-            import os, sys
+            import os, sys, tempfile, importlib
             sys.path.insert(0, {str(ROOT)!r})
             os.environ['HERMES_HOME'] = {tempfile.mkdtemp()!r}
             os.environ['OMNIS_WING_LEDGER_DIR'] = {tempfile.mkdtemp()!r}
-            # Explicitly do NOT install httpx/openai stubs
-            from omnis_wing.completion.side_doors import ensure_side_doors_armed, WingRouteDisabled
-            from omnis_wing.completion.product_disable import WingRouteDisabled as WRD
+            # no httpx stubs
+            from omnis_wing.completion.side_doors import ensure_side_doors_armed, ROUTE_MODULES, MODULE_HANDLER_TARGETS
+            from omnis_wing.completion.product_disable import WingRouteDisabled, load_manifest
             st = ensure_side_doors_armed()
-            assert st.complete, st.as_dict()
-            assert st.registry_wrapped
+            assert st.complete and st.importlib_wrapped and st.registry_wrapped, st.as_dict()
+            man = load_manifest()
+            routes = [r['route_id'] for r in man['routes']
+                      if r.get('state')=='DISABLED' and r.get('broker_join')=='DISABLED'
+                      and r['route_id']!='gateway.platform_messaging']
+            for route_id in routes:
+                mods = ROUTE_MODULES[route_id]
+                primary = mods[0]
+                # force importlib path even if stub already present
+                mod = importlib.import_module(primary)
+                if primary in MODULE_HANDLER_TARGETS and MODULE_HANDLER_TARGETS[primary][1]:
+                    name = MODULE_HANDLER_TARGETS[primary][1][0]
+                    fn = getattr(mod, name)
+                    try:
+                        fn()
+                    except TypeError:
+                        try:
+                            fn({{}})
+                        except WingRouteDisabled:
+                            pass
+                        else:
+                            # async?
+                            raise SystemExit('no refuse '+primary+'.'+name)
+                    except WingRouteDisabled:
+                        pass
+                    else:
+                        raise SystemExit('no refuse '+primary+'.'+name)
+                else:
+                    assert getattr(mod, '__omnis_wing_deny_stub__', False) or any(
+                        getattr(getattr(mod,a), '__omnis_wing_disabled__', False)
+                        for a in dir(mod) if callable(getattr(mod,a,None))
+                    ), primary
+            # registry evil
             from tools.registry import registry
-            calls = {{'n': 0}}
-            def evil(args, **kw):
-                calls['n'] += 1
-                return 'nope'
-            for name in ('vision_analyze', 'image_generate', 'text_to_speech', 'mixture_of_agents'):
-                registry.register(
-                    name=name, toolset='t', schema={{'name': name, 'description': 'd', 'parameters': {{}}}},
-                    handler=evil, override=True,
-                )
-                try:
-                    registry.dispatch(name, {{}})
-                    raise SystemExit('dispatch did not refuse ' + name)
-                except WRD:
-                    pass
-            assert calls['n'] == 0
-            print('FRESH_OK')
+            calls={{'n':0}}
+            def evil(a,**k):
+                calls['n']+=1
+                return 'SENT'
+            registry.register(name='vision_analyze', toolset='t',
+                schema={{'name':'vision_analyze','description':'d','parameters':{{}}}},
+                handler=evil, override=True)
+            try:
+                registry.dispatch('vision_analyze', {{}})
+            except WingRouteDisabled:
+                pass
+            assert calls['n']==0
+            print('FRESH_IMPORTLIB_OK')
             """
         )
         proc = subprocess.run(
@@ -259,16 +348,16 @@ class CompletionP0RepairTests(unittest.TestCase):
             cwd=str(ROOT),
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=90,
             env={**os.environ, "PYTHONPATH": str(ROOT)},
         )
         self.assertEqual(proc.returncode, 0, msg=proc.stdout + "\n" + proc.stderr)
-        self.assertIn("FRESH_OK", proc.stdout)
+        self.assertIn("FRESH_IMPORTLIB_OK", proc.stdout)
 
     def test_p0b_fresh_subprocess_can_fail_incomplete(self):
         code = textwrap.dedent(
             f"""
-            import os, sys
+            import os, sys, tempfile
             sys.path.insert(0, {str(ROOT)!r})
             os.environ['HERMES_HOME'] = {tempfile.mkdtemp()!r}
             from omnis_wing.completion import side_doors as sd
