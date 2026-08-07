@@ -394,15 +394,45 @@ def _wrap_importlib() -> None:
 
     def import_module_wrapped(name: str, package: Any = None):
         global _WRAPPING
-        mod = _ORIG_IMPORT_MODULE(name, package)
+        target = name
+        # If already a deny stub, return it (do not re-exec real file after del+import
+        # unless stub missing).
+        if name in sys.modules and getattr(sys.modules[name], "__omnis_wing_deny_stub__", False):
+            return sys.modules[name]
+        try:
+            mod = _ORIG_IMPORT_MODULE(name, package)
+        except Exception as exc:
+            # Watched disabled modules: fail closed to deny stub, never leave load hole
+            if name in watch_exact or any(name == w or name.startswith(w + ".") for w in watch_exact):
+                route_id = name
+                entry: Tuple[str, ...] = PLUGIN_ENTRY_NAMES
+                if name in MODULE_HANDLER_TARGETS:
+                    route_id, entry = MODULE_HANDLER_TARGETS[name]
+                elif name.startswith("plugins.image_gen") and "codex" in name:
+                    route_id = "plugins.image_gen.openai-codex"
+                elif name.startswith("plugins.image_gen"):
+                    route_id = "plugins.image_gen.openai"
+                elif name.startswith("plugins.video_gen"):
+                    route_id = "plugins.video_gen"
+                _STATE.errors.append(f"importlib_fail_stub:{name}:{type(exc).__name__}")
+                _install_deny_stub(name, route_id, entry or PLUGIN_ENTRY_NAMES)
+                return sys.modules[name]
+            raise
         if _WRAPPING:
             return mod
         _WRAPPING = True
         try:
-            # resolve absolute name
             abs_name = getattr(mod, "__name__", name)
             if abs_name in watch_exact or name in watch_exact:
                 _after_module_present(abs_name if abs_name in watch_exact else name)
+                # If patch could not disable entrypoints, replace with deny stub
+                check = abs_name if abs_name in watch_exact else name
+                if check in MODULE_HANDLER_TARGETS or check.startswith("plugins."):
+                    if not _module_entrypoints_disabled(check):
+                        route_id = MODULE_HANDLER_TARGETS.get(check, (check, ()))[0]
+                        entry = MODULE_HANDLER_TARGETS.get(check, (check, PLUGIN_ENTRY_NAMES))[1]
+                        _install_deny_stub(check, route_id, entry or PLUGIN_ENTRY_NAMES)
+                        return sys.modules[check]
             _maybe_patch_from_sys()
         finally:
             _WRAPPING = False
