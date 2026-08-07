@@ -43,6 +43,14 @@ from omnis_wing.absolute.receipt_spine import EvidencePersistError, SignerUnavai
 # Expanded body keys for anthropic/bedrock/codex shapes
 EXTRA_BODY_KEYS = frozenset(
     {
+        "timeout",
+        "store",
+        "include",
+        "parallel_tool_calls",
+        "extra_headers",
+        "reasoning_effort",
+        "service_tier",
+        "stream_options",
         "system",
         "max_tokens",
         "max_completion_tokens",

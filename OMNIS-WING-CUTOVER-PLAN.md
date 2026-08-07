@@ -50,3 +50,17 @@
 
 - Path A/B: stop using launcher; live `hermes` unchanged.
 - Path C: restore from backup zip; re-point `~/.local/bin/hermes`.
+
+
+## Path A try-it (same UX as live Videl)
+
+```bash
+hermes-wing chat          # interactive (profile ~/.hermes/profiles/videl-wing)
+hermes-wing chat -q "hi"  # one-shot
+```
+
+- Code: `~/projects/omnis-wing` via PYTHONPATH
+- Profile: copy of videl config/auth/SOUL under `videl-wing` (isolated sessions)
+- Live `hermes` + `videl` profile unchanged
+- Default `OMNIS_WING_SIGNER_MODE=test` (dogfood). After Keychain enroll, run with `OMNIS_WING_SIGNER_MODE=` empty for production posture.
+- Smoke observed: `hermes-wing chat -Q -q ...` → `WINGOK`

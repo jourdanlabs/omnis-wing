@@ -67,6 +67,7 @@ ALLOWED_BODY_KEYS = frozenset(
         "tool_choice",
         "response_format",
         "extra_body",
+        "extra_headers",
         "temperature",
         "top_p",
         "max_tokens",
@@ -81,6 +82,19 @@ ALLOWED_BODY_KEYS = frozenset(
         "seed",
         "logprobs",
         "top_logprobs",
+        # Real OpenAI-compatible / xAI client kwargs used by Hermes runtime
+        "timeout",
+        "store",
+        "include",
+        "parallel_tool_calls",
+        "reasoning_effort",
+        "service_tier",
+        "metadata",
+        "modalities",
+        "audio",
+        "prediction",
+        "web_search_options",
+        "stream_options",
     }
 )
 

@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# Dogfood launcher — Path A. Does not replace live hermes.
+# hermes-wing — Path A dogfood. Same chat UX as hermes; does not replace live hermes.
 set -euo pipefail
 ROOT="/Users/sokpyeon/projects/omnis-wing"
+VENV_PY="/Users/sokpyeon/.hermes/hermes-agent/venv/bin/python"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
-export HERMES_HOME="${HERMES_HOME:-/Users/sokpyeon/.hermes/omnis-wing-dogfood}"
-export OMNIS_WING_LEDGER_DIR="${OMNIS_WING_LEDGER_DIR:-/Users/sokpyeon/.hermes/omnis-wing-dogfood/ledgers}"
-# Product default: no disposable signer. For labeled dogfood only:
-#   OMNIS_WING_SIGNER_MODE=test hermes-wing ...
-exec "/Users/sokpyeon/.hermes/hermes-agent/venv/bin/python" "$ROOT/cli.py" "$@"
+export HERMES_HOME="${HERMES_HOME:-/Users/sokpyeon/.hermes/profiles/videl-wing}"
+export OMNIS_WING_LEDGER_DIR="${OMNIS_WING_LEDGER_DIR:-/Users/sokpyeon/.omnis-wing/ledgers}"
+export OMNIS_WING_WORKSPACE="${OMNIS_WING_WORKSPACE:-$HERMES_HOME/workspace}"
+# Dogfood default: labeled test signer so AI can send without Keychain enroll.
+# Production: unset OMNIS_WING_SIGNER_MODE after explicit keychain enroll.
+export OMNIS_WING_SIGNER_MODE="${OMNIS_WING_SIGNER_MODE:-test}"
+if [[ "${OMNIS_WING_QUIET_BANNER:-}" != "1" ]]; then
+  echo "[hermes-wing] HERMES_HOME=$HERMES_HOME" >&2
+  echo "[hermes-wing] code=$ROOT (PYTHONPATH)" >&2
+  echo "[hermes-wing] signer_mode=$OMNIS_WING_SIGNER_MODE (test=dogfood; unset after keychain enroll)" >&2
+fi
+# Prefer WING hermes_cli via PYTHONPATH; use venv deps
+exec "$VENV_PY" -c 'import sys; from hermes_cli.main import main; sys.exit(main())' "$@"
