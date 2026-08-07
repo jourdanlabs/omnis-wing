@@ -15,7 +15,7 @@
 | **Implementation commit** (signer attach runtime) | `9608a6851fc7f674a10c4c2ee7c7849b27d94811` |
 | **Handoff commit** (docs pin of that tip) | `f66e073e5c20ac1fb1e30e854b8f044077071071` |
 | **HOLD repair implementation** | `443fc610094d1c09047e65afd39ef079c80da35d` |
-| **HOLD repair handoff tip** (this file pin) | `4fe7e703ee9136423bb0e0d8b6aad5d3d3758f29` |
+| **HOLD repair handoff tip** | `ad2a2913666ab6af77c5b8d56ae4344f2b0d0dc3` (update if amended) |
 | Prior completion CLEAR | `b25eecbea7e0b45bcecc69d6ee8ce69ebe8f4399` |
 | Live Hermes (untouched) | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` |
 | Captain Keychain tag | `ai.jourdanlabs.omnis-wing.terminus.r4` |
