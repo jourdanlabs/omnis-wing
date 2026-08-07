@@ -1,9 +1,9 @@
 # STALE CANDIDATE BANNER — READ FIRST
 
-**DO NOT GATE:** `e480339cce90ee3697cebdc60db8767e88df3626`  
+**DO NOT GATE:** `e480339cce…` (old install) **nor** `30759cc880…` (builtins-hook-only arming)  
 That tip still has blanket side-door install + `_INSTALLED=True` on partial failure. Bulma HOLD on that SHA is correct **for that SHA only**.
 
-**GATE THIS TIP INSTEAD:** `cf7232388d36167a781411e465028ca76ad67cc3`  
+**GATE THIS TIP INSTEAD:** `69280700a57347f59e599f473aff6083eaaf941c`  
 **P0-B mechanism commit:** `752559f326f74be9fc098ac2582d4f5a5352e3d0`  
 **Authority BBB:** `b1326dc57f4dde5922406e2033d14b0487dc387ab791e9fdecd3282907ad0bd6`
 
@@ -37,8 +37,8 @@ On the gate tip:
 | BBB SHA-256 | `b1326dc57f4dde5922406e2033d14b0487dc387ab791e9fdecd3282907ad0bd6` |
 | Start pin | `89ccebae7922cab0645ecb4e8d145eb5d8a469c5` (R4.1 CLEAR) |
 | Feature ship commit | `a8cd6c89e940bf2158d0ed3a73c1b0e1f97cdf7a` |
-| P0-B mechanism commit | `752559f326f74be9fc098ac2582d4f5a5352e3d0` |
-| Repo tip at handoff | `cf7232388d36167a781411e465028ca76ad67cc3` |
+| P0-B mechanism commit | `69280700a57347f59e599f473aff6083eaaf941c` |
+| Repo tip at handoff | `69280700a57347f59e599f473aff6083eaaf941c` |
 
 ## Captain outcome (plain English)
 
