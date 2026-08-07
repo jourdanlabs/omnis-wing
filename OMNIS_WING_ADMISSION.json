@@ -3,7 +3,7 @@
   "contract_protocol_version": "omnis-wing.admission.v0",
   "upstream_hermes_url": "https://github.com/NousResearch/Hermes-Agent.git",
   "upstream_hermes_commit": "2213ea9fa73ab06cf667c1bfb1e99c8de3541589",
-  "fork_commit": "PENDING",
+  "fork_commit": "4673b75b23658ffd03d3c49fa11cd50d566bee6b",
   "cadmus_input_sha256": "b92d45d70cef12e1e123504c9465088b67ad8158161a85172d726336f3850de4",
   "cadmus_input_path": "omnis_wing/spec/omnis-wing-v0.cadmus-input.json",
   "isolation": {
