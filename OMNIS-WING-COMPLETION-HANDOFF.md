@@ -15,7 +15,8 @@
 | BBB SHA-256 | `b1326dc57f4dde5922406e2033d14b0487dc387ab791e9fdecd3282907ad0bd6` |
 | Start pin | `89ccebae7922cab0645ecb4e8d145eb5d8a469c5` (R4.1 CLEAR) |
 | Feature ship commit | `a8cd6c89e940bf2158d0ed3a73c1b0e1f97cdf7a` |
-| Repo tip at handoff | run `git rev-parse HEAD` on branch `omnis-wing/v0-admission` |
+| Re-gate tip (P0-B fail-closed) | `752559f326f74be9fc098ac2582d4f5a5352e3d0` |
+| Repo tip at handoff | `e782f15c78d84e38721c8bf9aa5e7dd1dbe1c4e8` |
 
 ## Captain outcome (plain English)
 
