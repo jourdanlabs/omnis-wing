@@ -14,8 +14,8 @@
 | Branch | `omnis-wing/v0-admission` |
 | **Implementation commit** (signer attach runtime) | `9608a6851fc7f674a10c4c2ee7c7849b27d94811` |
 | **Handoff commit** (docs pin of that tip) | `f66e073e5c20ac1fb1e30e854b8f044077071071` |
-| **HOLD repair implementation** | `443fc610094d1c09047e65afd39ef079c80da35d` |
-| **HOLD repair handoff tip** | `a9b160ae90a6ea1024b764cb74b9d6cd87d04dd1` |
+| **HOLD repair code** | `443fc610094d1c09047e65afd39ef079c80da35d` |
+| **Branch HEAD at gate** | run `git -C ~/projects/omnis-wing rev-parse HEAD` (docs-only commits may sit atop 443fc) |
 | Prior completion CLEAR | `b25eecbea7e0b45bcecc69d6ee8ce69ebe8f4399` |
 | Live Hermes (untouched) | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` |
 | Captain Keychain tag | `ai.jourdanlabs.omnis-wing.terminus.r4` |
