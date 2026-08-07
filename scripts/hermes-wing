@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Dogfood launcher — Path A. Does not replace live hermes.
+set -euo pipefail
+ROOT="/Users/sokpyeon/projects/omnis-wing"
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export HERMES_HOME="${HERMES_HOME:-/Users/sokpyeon/.hermes/omnis-wing-dogfood}"
+export OMNIS_WING_LEDGER_DIR="${OMNIS_WING_LEDGER_DIR:-/Users/sokpyeon/.hermes/omnis-wing-dogfood/ledgers}"
+# Product default: no disposable signer. For labeled dogfood only:
+#   OMNIS_WING_SIGNER_MODE=test hermes-wing ...
+exec "/Users/sokpyeon/.hermes/hermes-agent/venv/bin/python" "$ROOT/cli.py" "$@"
