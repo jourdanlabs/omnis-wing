@@ -33,7 +33,7 @@ This is still **not** full TERMINUS ABSOLUTE certification.
 | W0 intro fork_commit | `204a6a302af5e47d63de7e948e735f97a7d84e44` |
 | R1 candidate (pre-H6) | `10a97a214f64e78c51543cdf1f918d42df978f57` |
 | R1.1 repair commit | `7cce236286c64d1f7750a5c05eb7d99c7f23cf54` |
-| HEAD at handoff | `7cce236286c64d1f7750a5c05eb7d99c7f23cf54` (plus handoff commit if present) |
+| HEAD at handoff | *(gate: git rev-parse HEAD; must contain R1.1 repair 7cce236286)* |
 | Live Hermes | **untouched** |
 
 ---
