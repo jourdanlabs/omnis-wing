@@ -34,7 +34,12 @@ def assert_manifest_honest(root: Path) -> None:
         if entry.get("status") != "governed":
             raise AssertionError(f"governed entry bad status: {entry}")
     for entry in man["inherited_hermes_transport"]:
-        if entry.get("status") not in ("ungoverned", "inbound", "outside_r1"):
+        if entry.get("status") not in (
+            "ungoverned",
+            "inbound",
+            "outside_r1",
+            "outside_r2",
+        ):
             raise AssertionError(f"inherited entry must not claim governed: {entry}")
     if man.get("claims_whole_tree_ai_egress"):
         raise AssertionError("manifest must not claim whole-tree AI egress")

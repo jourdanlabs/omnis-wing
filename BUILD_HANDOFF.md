@@ -1,98 +1,126 @@
-# BUILD_HANDOFF — OMNIS WING R1.1 ABSOLUTE-shaped host slice
+# BUILD_HANDOFF — OMNIS WING R2: one real chat path
 
 **Final status: `READY_FOR_GATE`**
 
 Builder: Videl  
 Date: 2026-08-07  
 Repo: `~/projects/omnis-wing`  
-Prior: R1 @ `10a97a214f` strong seam, **HOLD H6** (empty `path_class` permitted)
-
-## R1.1 statement
-
-H6 closed. Destination completeness now requires non-empty, strip-normalized `path_class`. Empty / whitespace-only endpoint class → `REFUSE_DESTINATION`, `phase=NONE`, broker calls `0`. Destination-mutation control unchanged. Scope not expanded. Live Hermes not touched.
-
-This is still **not** full TERMINUS ABSOLUTE certification.
+Base: `be071263da794a65b6dfd8b4e16ab9f9d3ba54e7` (R1.1)  
+HEAD at handoff: *(gate: `git rev-parse HEAD`)*
 
 ---
 
-## 1. CADMUS authority (R1 — unchanged)
+## 1. CADMUS authority (R2)
 
 | Field | Value |
 |---|---|
-| Path | `omnis_wing/spec/omnis-wing-r1-absolute.cadmus-input.json` |
-| SHA-256 | `b4dcb959ddda7a0ac488817e65fed255a31da6e077c20596d90d62fe0e121805` |
+| Path | `omnis_wing/spec/omnis-wing-r2-live-chat-path.cadmus-input.json` |
+| SHA-256 | `c12e0cb582634fca8a5bec1f5468c50cb82cf80b9661287a602acfb96d7396dd` |
+
+R1 authority unchanged: `b4dcb959ddda7a0ac488817e65fed255a31da6e077c20596d90d62fe0e121805`
 
 ---
 
-## 2. Base / fork
+## 2. Selected real call chain
 
-| Field | Value |
+Ordinary **non-streaming** OpenAI-compatible user chat path (default `api_mode` / `chat_completions`):
+
+```text
+AIAgent._interruptible_api_call  (run_agent.py forwarder)
+  → agent.chat_completion_helpers.interruptible_api_call
+    → _call() else-branch  # not codex / anthropic / bedrock
+      → agent._create_request_openai_client(reason="chat_completion_request")
+      → omnis_wing.absolute.hermes_chat_join.governed_chat_completions_create
+           messages → canonical JSON bytes = OutboundEnvelope.payload_bytes
+           → dispatch_outbound / decide_and_execute (R1.1 evaluator)
+           → ChatCompletionsClientBroker.transmit
+                → client.chat.completions.create(**api_kwargs with messages
+                     re-loaded from envelope.payload_bytes ONLY)
+```
+
+**Not selected:** streaming (`interruptible_streaming_api_call`), `anthropic_messages`, `bedrock_converse`, `codex_responses`, auxiliary client, diagnostics-only helpers.
+
+---
+
+## 3. Files changed
+
+| Path | Why |
 |---|---|
-| Upstream | `https://github.com/NousResearch/Hermes-Agent.git` |
-| Base commit | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` |
-| W0 intro fork_commit | `204a6a302af5e47d63de7e948e735f97a7d84e44` |
-| R1 candidate (pre-H6) | `10a97a214f64e78c51543cdf1f918d42df978f57` |
-| R1.1 repair commit | `7cce236286c64d1f7750a5c05eb7d99c7f23cf54` |
-| HEAD at handoff | *(gate: git rev-parse HEAD; must contain R1.1 repair 7cce236286)* |
-| Live Hermes | **untouched** |
+| `omnis_wing/absolute/hermes_chat_join.py` | R2 sole join + fake-capable broker |
+| `agent/chat_completion_helpers.py` | Replace direct `chat.completions.create` on selected branch with governed join |
+| `omnis_wing/coverage/ai_egress_coverage_r1.json` | `governed_r2` + honest `outside_r2` labels |
+| `omnis_wing/absolute/coverage.py` | Accept `outside_r2` status |
+| `omnis_wing/transport_guard.py` | Guard R2 `omnis_wing/*` join module (not whole Hermes host file) |
+| `omnis_wing/spec/omnis-wing-r2-live-chat-path.cadmus-input.json` | Admitted R2 authority |
+| `tests/omnis_wing/test_r2_chat_path.py` | Real-path cold controls via `interruptible_api_call` |
+| `tests/omnis_wing/test_absolute_r1.py` | Allow `outside_r2` in inherited statuses |
+| `scripts/run_omnis_wing_v0_tests.sh` | python≥3.11 + R2 suite |
+| `BUILD_HANDOFF.md` | This document |
+
+Live `~/.hermes/hermes-agent`: **not modified**.
 
 ---
 
-## 3. R1.1 delta (files)
+## 4. Payload equality boundary
 
-| Path | Change |
-|---|---|
-| `omnis_wing/absolute/evaluator.py` | Require non-empty stripped `path_class` → else `REFUSE_DESTINATION` |
-| `tests/omnis_wing/test_absolute_r1.py` | `test_06b_empty_path_class_refuse_destination_zero_calls` (`''`, `'   '`, `'\t'`) |
-| `BUILD_HANDOFF.md` | This R1.1 statement |
+**In claim:** `api_kwargs["messages"]` → compact UTF-8 JSON bytes = envelope payload = bytes re-delivered as `messages` to fake client.
+
+**Outside R2 (explicitly not claimed equal):** HTTP/TLS framing, auth headers, `model` / `temperature` / `tools` / `extra_body` and other non-message kwargs, base_url path, provider SDK assembly.
 
 ---
 
-## 4. Cold commands + results
+## 5. Cold command + results
 
 ```sh
 cd ~/projects/omnis-wing
 ./scripts/run_omnis_wing_v0_tests.sh
+# uses python3.11+
 ```
 
-Builder observation: **19/19 OK** (8 W0 + 11 R1/R1.1).
+Builder observation: **25/25 OK** (8 W0 + 11 R1/R1.1 + 6 R2).
 
 | Control | Observed |
 |---|---|
-| protected project → CN | `REFUSE_RESIDENCY`; stub 0 |
-| missing/invalid provenance | `REFUSE_SOURCE_POLICY`; stub 0 |
-| planted secret | `REFUSE_SECRET`; no cleartext/bare-sha; stub 0 |
-| scanner failure | `REFUSE_SCANNER_FAILURE`; stub 0 |
-| allowed generic | bytes equal; `AUTHORIZED→STARTED→COMPLETED` |
-| destination mutation | `REFUSE_DESTINATION`; stub 0 |
-| **empty/blank path_class (H6)** | **`REFUSE_DESTINATION`; phase NONE; stub 0** |
-| planted `httpx` | guard fails |
-| coverage manifest | honest; whole-tree false |
+| protected project + CN via `interruptible_api_call` | `WingRefusal` / `REFUSE_RESIDENCY`, phase `NONE`, fake client **0** |
+| missing provenance (no `wing_egress_context`) | `REFUSE_SOURCE_POLICY`, fake client **0** |
+| generic + US destination | `PERMIT` path completes; fake client **1**; received message bytes == evaluated payload bytes |
+| legacy direct `create` removed from selected branch | source assert; planted direct create is not the production join |
+| R1.1 regression | all prior tests green |
+
+Fake client evidence: `FakeClient.create_calls` and `received_messages_bytes` recorded in R2 tests.
 
 ---
 
-## 5. Non-claims (unchanged, blunt)
+## 6. Coverage delta
 
-- Not TERMINUS ABSOLUTE complete.  
-- Not receipt signing/chain/anchor (H5).  
-- Not full source-taint propagation.  
-- Not full inherited-Hermes AI-egress classification.  
-- Not live Hermes/Videl wiring, real providers, package, push.  
-- Not workstation DLP / all modalities.
+`governed_r2`:
+- `omnis_wing/absolute/hermes_chat_join.py`
+- `agent/chat_completion_helpers.py` (join site only; file still has upstream HTTP imports — import guard does **not** claim that file clean)
+
+Everything else: `outside_r2` / inbound / ungoverned.  
+`claims_all_hermes_chat_paths: false`  
+`claims_whole_tree_ai_egress: false`
 
 ---
 
-## 6. Gate re-run
+## 7. Non-claims (blunt)
 
-```sh
-cd ~/projects/omnis-wing
-git status --short
-git rev-parse HEAD
-./scripts/run_omnis_wing_v0_tests.sh
-# expect 19/19 OK including test_06b_empty_path_class_refuse_destination_zero_calls
-```
+- Not all Hermes chat paths, streaming, tools, MCP, images, retries, fallbacks.  
+- Not live Videl/Hermes wiring, real providers, tokens, sessions.  
+- Not TERMINUS ABSOLUTE complete; not receipt signing/chain.  
+- Not full source-taint productization.  
+- Not package/push.  
+- Agent must set `wing_egress_context` with explicit provenance+destination; absent context refuses (by design on this path).
 
-**READY_FOR_GATE** for R1.1 destination-binding repair only.
+---
+
+## 8. Live attestation
+
+- Fork-only work under `~/projects/omnis-wing`.  
+- `~/.hermes/hermes-agent` left dirty at base pin (pre-existing).  
+- R2 tests set `HERMES_HOME` to a temp dir before imports so live profile is not used.
+
+**READY_FOR_GATE**
 
 🫡 + 🔑  
 — Videl

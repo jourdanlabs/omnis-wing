@@ -75,10 +75,22 @@ def scan_paths(paths: Iterable[Path]) -> list[str]:
 
 
 def r1_governed_paths(repo_root: Path) -> List[Path]:
+    """Paths subject to the import/transport guard.
+
+    Coverage may list Hermes host files as governed_r2 for the join site, but
+    those files still contain upstream HTTP imports. The guard applies to
+    omnis_wing package modules only (including R2 hermes_chat_join).
+    """
     man_path = repo_root / "omnis_wing" / "coverage" / "ai_egress_coverage_r1.json"
     data = json.loads(man_path.read_text(encoding="utf-8"))
-    paths = [repo_root / e["path"] for e in data["governed_r1"]]
-    # also historical W0 seam under package
+    paths = [repo_root / e["path"] for e in data.get("governed_r1", [])]
+    for e in data.get("governed_r2", []):
+        rel = e["path"]
+        if not rel.startswith("omnis_wing/"):
+            continue  # host join file: coverage-claimed, not import-clean
+        p = repo_root / rel
+        if p not in paths:
+            paths.append(p)
     for extra in (
         repo_root / "omnis_wing" / "boundary.py",
         repo_root / "omnis_wing" / "host_dispatch.py",

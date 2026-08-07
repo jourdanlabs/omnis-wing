@@ -271,7 +271,10 @@ class AbsoluteR1Tests(unittest.TestCase):
         for p in governed:
             self.assertTrue(p.is_file(), p)
         for entry in man["inherited_hermes_transport"]:
-            self.assertIn(entry["status"], ("ungoverned", "inbound", "outside_r1"))
+            self.assertIn(
+                entry["status"],
+                ("ungoverned", "inbound", "outside_r1", "outside_r2"),
+            )
 
     def test_09_r1_guard_covers_all_governed_modules(self):
         paths = r1_governed_paths(ROOT)

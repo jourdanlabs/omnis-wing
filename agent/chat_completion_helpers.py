@@ -236,7 +236,19 @@ def interruptible_api_call(agent, api_kwargs: dict):
                         api_kwargs=api_kwargs,
                     )
                 )
-                result["response"] = request_client.chat.completions.create(**api_kwargs)
+                # OMNIS WING R2: ordinary non-streaming chat_completions join.
+                # Direct client.chat.completions.create is not used on this path;
+                # all traffic goes through dispatch_outbound first.
+                from omnis_wing.absolute.hermes_chat_join import (
+                    governed_chat_completions_create,
+                    resolve_wing_context,
+                )
+
+                result["response"] = governed_chat_completions_create(
+                    request_client,
+                    api_kwargs,
+                    resolve_wing_context(agent),
+                )
         except Exception as e:
             # If the request was cancelled by the main thread's interrupt
             # handler, the transport error is the expected consequence of our

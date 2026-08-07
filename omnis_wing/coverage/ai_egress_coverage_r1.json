@@ -4,11 +4,13 @@
   "coverage_class": "AI_EGRESS_GOVERNED_R1_SEAM_ONLY",
   "claims_whole_tree_ai_egress": false,
   "claims_absolute_complete": false,
+  "claims_all_hermes_chat_paths": false,
   "glass": {
-    "active_boundary": "AI EGRESS GOVERNED (R1 seam only)",
+    "active_boundary": "AI EGRESS GOVERNED (R1 seam + R2 single chat_completions join)",
     "also_true": [
-      "IDE-OWNED EGRESS GOVERNED — not claimed in R1",
-      "WORKSTATION EGRESS NOT GOVERNED"
+      "IDE-OWNED EGRESS GOVERNED — not claimed",
+      "WORKSTATION EGRESS NOT GOVERNED",
+      "Streaming / anthropic_messages / bedrock / codex_responses — outside_r2"
     ]
   },
   "governed_r1": [
@@ -48,25 +50,47 @@
       "role": "import/transport guard for R1-governed modules"
     }
   ],
+  "governed_r2": [
+    {
+      "path": "omnis_wing/absolute/hermes_chat_join.py",
+      "status": "governed_r2",
+      "role": "R2 sole join: messages → OutboundEnvelope → dispatch_outbound → client.create"
+    },
+    {
+      "path": "agent/chat_completion_helpers.py",
+      "status": "governed_r2",
+      "role": "interruptible_api_call non-stream chat_completions branch uses governed join only"
+    }
+  ],
   "inherited_hermes_transport": [
     {
       "path_glob": "agent/**/*.py",
-      "status": "outside_r1",
-      "note": "Hundreds of HTTP/provider imports exist in upstream Hermes; not classified as governed AI egress in R1."
+      "status": "outside_r2",
+      "note": "Except agent/chat_completion_helpers.py join site listed in governed_r2. All other agent transports remain ungoverned for AI egress in R2."
+    },
+    {
+      "path_glob": "agent/chat_completion_helpers.py#interruptible_streaming_api_call",
+      "status": "outside_r2",
+      "note": "Streaming path not wired in R2."
+    },
+    {
+      "path_glob": "agent/chat_completion_helpers.py#anthropic|bedrock|codex branches",
+      "status": "outside_r2",
+      "note": "Non-chat_completions api_mode branches not wired in R2."
     },
     {
       "path_glob": "tools/**/*.py",
-      "status": "outside_r1",
-      "note": "Tool transports (messaging, webhooks) ungoverned by this seam."
+      "status": "outside_r2",
+      "note": "Tool transports ungoverned."
     },
     {
       "path_glob": "gateway/**/*.py",
       "status": "inbound",
-      "note": "Gateway inbound channel handling; not R1 outbound AI broker."
+      "note": "Gateway inbound; not R2 outbound AI broker."
     },
     {
       "path_glob": "hermes_cli/**/*.py",
-      "status": "outside_r1",
+      "status": "outside_r2",
       "note": "CLI/auth utilities; not claimed."
     }
   ],
@@ -74,5 +98,10 @@
     "path": "omnis_wing/boundary.py",
     "status": "historical_w0_clear",
     "note": "W0 prototype CLEAR for admission; not ABSOLUTE host proof."
-  }
+  },
+  "r2_outside_payload_equality": [
+    "HTTP framing, TLS, Authorization headers",
+    "api_kwargs fields other than messages (model, temperature, tools, extra_body)",
+    "base_url path and provider SDK request assembly after broker delivers messages"
+  ]
 }
