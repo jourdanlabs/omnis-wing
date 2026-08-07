@@ -219,6 +219,28 @@ class AbsoluteR1Tests(unittest.TestCase):
         self.assertEqual(receipt.decision, "REFUSE_DESTINATION")
         self.assertEqual(broker.calls, 0)
 
+    def test_06b_empty_path_class_refuse_destination_zero_calls(self):
+        """H6: ABSOLUTE binds path_class; empty/blank endpoint class must refuse."""
+        payload = "generic allow would succeed except empty path_class"
+        for blank in ("", "   ", "\t"):
+            env = OutboundEnvelope.create(
+                modality="chat",
+                lane="wing-r1",
+                payload=payload,
+                sources=(_generic_source(payload),),
+                destination=_dest(path_class=blank, residency="US"),
+            )
+            broker = RecordingBroker()
+            receipt = decide_and_execute(env, broker)
+            self.assertEqual(
+                receipt.decision,
+                "REFUSE_DESTINATION",
+                f"path_class={blank!r} must refuse",
+            )
+            self.assertEqual(receipt.phase, "NONE")
+            self.assertEqual(receipt.provider_calls, 0)
+            self.assertEqual(broker.calls, 0)
+
     def test_07_planted_direct_transport_import_fails_guard(self):
         assert_clean_package(ROOT / "omnis_wing")
         planted = "import httpx\n\ndef p():\n    return httpx.get('https://x')\n"

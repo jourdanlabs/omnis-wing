@@ -122,6 +122,10 @@ def evaluate_decision(
         return auth("REFUSE_DESTINATION", "external providers require https")
     if not dest.hostname or not dest.provider or int(dest.port) <= 0:
         return auth("REFUSE_DESTINATION", "incomplete destination")
+    # ABSOLUTE destination binding requires non-empty endpoint/path class (H6).
+    path_class = (dest.path_class or "").strip()
+    if not path_class:
+        return auth("REFUSE_DESTINATION", "empty or blank path_class")
 
     if authorized_destination is not None:
         if authorized_destination.binding_tuple() != binding:
