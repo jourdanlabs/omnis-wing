@@ -73,12 +73,9 @@ def resolve_evidence_session(agent=None) -> EvidenceSession:
     → UnavailableSigner → REFUSE_POLICY_INVALID before provider call.
     """
     # Install side-door product disables on every evidence resolution (startup path)
-    try:
-        from omnis_wing.completion.side_doors import install_side_door_guards
+    from omnis_wing.completion.side_doors import ensure_side_doors_armed
 
-        install_side_door_guards()
-    except Exception:
-        pass
+    ensure_side_doors_armed()
 
     if agent is not None:
         existing = getattr(agent, "wing_evidence_session", None)
@@ -118,12 +115,9 @@ def ensure_agent_wing_context(agent, api_kwargs: dict | None = None) -> WingEgre
 
     Explicit context (including empty sources) is preserved.
     """
-    try:
-        from omnis_wing.completion.side_doors import install_side_door_guards
+    from omnis_wing.completion.side_doors import ensure_side_doors_armed
 
-        install_side_door_guards()
-    except Exception:
-        pass
+    ensure_side_doors_armed()
 
     ctx = getattr(agent, "wing_egress_context", None)
     if ctx is not None:

@@ -1,7 +1,7 @@
 # OMNIS WING COMPLETION HANDOFF
 
 **Builder verdict: `READY_FOR_GATE`** (never self-CLEAR)  
-**HOLD repairs applied:** P0-A product default refuses without production signer (test signer opt-in only); P0-B real handler disables installed from primary WING imports; P1 handoff hygiene + real IT command.
+**HOLD repairs applied:** P0-A product default refuses without production signer (test signer opt-in only). P0-B side-door arming is fail-closed at `tools.registry` register/dispatch + import hook; `ensure_side_doors_armed()` raises `SideDoorArmingError` if any declared DISABLED route is unresolved; no blanket except-pass; incomplete install never reports complete. P1 handoff hygiene + real IT command. Fresh-process can-fails included.
   
 **Builder:** Videl  
 **Independent gate:** Bulma  
@@ -66,7 +66,7 @@ cd ~/projects/omnis-wing
 ./scripts/run_omnis_wing_v0_tests.sh
 ```
 
-Builder observation: **76 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_KEYCHAIN_IT=1`).
+Builder observation: **80 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_KEYCHAIN_IT=1`).
 
 ### Can-fail table (completion + retained spine)
 
@@ -84,6 +84,9 @@ Builder observation: **76 tests, 1 skipped** (Keychain IT unless `OMNIS_WING_R4_
 | Product default no production signer | UnavailableSigner; REFUSE_POLICY_INVALID, client 0 |
 | Real side-door handlers (_handle_vision_analyze, text_to_speech_tool, …) | WingRouteDisabled |
 | Handoff hygiene planted marker | absent; real IT path present |
+| Registry dispatch disabled tools | WingRouteDisabled, transport 0 |
+| Fresh subprocess no dep stubs | ensure arms; dispatch refuse |
+| Forced unresolved DISABLED route | SideDoorArmingError; complete=False |
 | Manifest no outside/later | pass |
 | BBB digest | pass |
 | R1–R4.1 regression | green |

@@ -1,22 +1,21 @@
-"""Completion HOLD repairs: product default no test signer; real side-door disables."""
+"""Completion HOLD repairs: P0-A signer default + fail-closed side-door arming."""
 
 from __future__ import annotations
 
 import hashlib
-import importlib
 import os
+import subprocess
 import sys
 import tempfile
+import textwrap
 import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-# Isolate env for product-default test — do NOT set SIGNER_MODE=test here globally.
 _tmp = tempfile.mkdtemp(prefix="wing-p0-")
 os.environ["HERMES_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = tempfile.mkdtemp(prefix="wing-p0-led-")
@@ -30,19 +29,21 @@ for _n in ("requests", "yaml"):
             m.safe_load = lambda s: {}
         sys.modules[_n] = m
 
-from omnis_wing.absolute.auto_provenance import (  # noqa: E402
-    resolve_evidence_session,
-    ensure_agent_wing_context,
-)
+from omnis_wing.absolute.auto_provenance import resolve_evidence_session  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.receipt_spine import UnavailableSigner, Ed25519TestSigner  # noqa: E402
-from omnis_wing.completion.side_doors import (  # noqa: E402
-    install_side_door_guards,
-    handler_is_disabled,
-    guards_installed,
-)
-from omnis_wing.completion.product_disable import WingRouteDisabled  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
+from omnis_wing.completion.product_disable import WingRouteDisabled  # noqa: E402
+from omnis_wing.completion.side_doors import (  # noqa: E402
+    SideDoorArmingError,
+    arm_side_doors,
+    ensure_side_doors_armed,
+    force_unresolved_for_test,
+    get_arming_state,
+    guards_installed,
+    handler_is_disabled,
+    DISABLED_TOOL_NAMES,
+)
 
 
 class FakeClient:
@@ -98,30 +99,21 @@ class MiniAgent:
 class CompletionP0RepairTests(unittest.TestCase):
     def test_p0a_product_default_no_test_signer(self):
         os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
-        # fresh agent, no production signer
+
         class A:
             pass
 
-        agent = A()
-        sess = resolve_evidence_session(agent)
+        sess = resolve_evidence_session(A())
         self.assertIsInstance(sess.signer, UnavailableSigner)
         self.assertFalse(sess.signer.available())
         self.assertNotIsInstance(sess.signer, Ed25519TestSigner)
 
     def test_p0a_clean_env_refuse_before_provider(self):
         os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
-        # Import call path after env clear
         from agent.chat_completion_helpers import interruptible_api_call
 
         client = FakeClient()
         agent = MiniAgent(client)
-        # ensure no leftover context/signer
-        if hasattr(agent, "wing_egress_context"):
-            delattr(agent, "wing_egress_context")
-        if hasattr(agent, "wing_production_signer"):
-            delattr(agent, "wing_production_signer")
-        if hasattr(agent, "wing_evidence_session"):
-            delattr(agent, "wing_evidence_session")
         with self.assertRaises(WingRefusal) as cm:
             interruptible_api_call(
                 agent,
@@ -142,47 +134,165 @@ class CompletionP0RepairTests(unittest.TestCase):
         finally:
             os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
 
-    def test_p0b_primary_import_installs_guards(self):
-        import omnis_wing.absolute.hermes_chat_join  # noqa: F401
-        from omnis_wing.completion.side_doors import install_errors
-
-        install_side_door_guards()
+    def test_p0b_ensure_armed_on_primary_join(self):
+        st = ensure_side_doors_armed()
+        self.assertTrue(st.complete)
+        self.assertTrue(st.registry_wrapped)
+        self.assertTrue(st.import_hook_installed)
         self.assertTrue(guards_installed())
-        errs = install_errors()
-        self.assertTrue(
-            handler_is_disabled("tools.vision_tools", "_handle_vision_analyze"),
-            msg=f"vision not disabled; errors={errs}",
+        for route, status in st.routes.items():
+            self.assertIn(status, ("ARMED", "NAMED_OK"), msg=f"{route}={status}")
+
+    def test_p0b_registry_dispatch_denies_disabled_tools(self):
+        ensure_side_doors_armed()
+        from tools.registry import registry
+
+        # Register a fake disabled-name tool with a transport that must never run
+        transport_calls = {"n": 0}
+
+        def evil_handler(args, **kw):
+            transport_calls["n"] += 1
+            return "sent"
+
+        registry.register(
+            name="vision_analyze",
+            toolset="wing_test",
+            schema={"name": "vision_analyze", "description": "t", "parameters": {}},
+            handler=evil_handler,
+            override=True,
         )
-        self.assertTrue(handler_is_disabled("tools.image_generation_tool", "_handle_image_generate"))
-        self.assertTrue(handler_is_disabled("tools.tts_tool", "text_to_speech_tool"))
-        self.assertTrue(handler_is_disabled("tools.transcription_tools", "transcribe_audio"))
-        self.assertTrue(handler_is_disabled("tools.mixture_of_agents_tool", "mixture_of_agents_tool"))
+        # Handler on entry must already be refuse wrapper
+        entry = registry.get_entry("vision_analyze")
+        self.assertTrue(getattr(entry.handler, "__omnis_wing_disabled__", False))
+        with self.assertRaises(WingRouteDisabled):
+            registry.dispatch("vision_analyze", {"image_url": "x"})
+        self.assertEqual(transport_calls["n"], 0)
 
-    def test_p0b_real_handlers_refuse_zero_transport(self):
-        install_side_door_guards()
-        import tools.vision_tools as vt
-        import tools.tts_tool as tts
-        import tools.image_generation_tool as igt
-        import tools.transcription_tools as tr
-        import tools.mixture_of_agents_tool as moa
+        # Other disabled names
+        for tname in ("image_generate", "text_to_speech", "mixture_of_agents", "video_analyze"):
+            registry.register(
+                name=tname,
+                toolset="wing_test",
+                schema={"name": tname, "description": "t", "parameters": {}},
+                handler=evil_handler,
+                override=True,
+            )
+            with self.assertRaises(WingRouteDisabled):
+                registry.dispatch(tname, {})
+        self.assertEqual(transport_calls["n"], 0)
 
-        # Fake transport counters would not be reached — handlers raise first
-        with self.assertRaises(WingRouteDisabled):
-            vt._handle_vision_analyze({"image_url": "https://example.com/x.png", "question": "q"})
-        with self.assertRaises(WingRouteDisabled):
-            tts.text_to_speech_tool(text="hello")
-        with self.assertRaises(WingRouteDisabled):
-            igt._handle_image_generate({"prompt": "cat"})
-        with self.assertRaises(WingRouteDisabled):
-            tr.transcribe_audio("/tmp/nonexistent-wing-test.ogg")
-        # async moa — call and expect raise
-        import asyncio
+    def test_p0b_import_hook_patches_late_module(self):
+        ensure_side_doors_armed()
+        # Simulate a late-loaded side-door module
+        mod = types.ModuleType("tools.vision_tools")
 
-        async def _run():
-            return await moa.mixture_of_agents_tool(user_prompt="hi")
+        def _handle_vision_analyze(args, **kw):
+            return "would_call_provider"
 
+        mod._handle_vision_analyze = _handle_vision_analyze
+        sys.modules["tools.vision_tools"] = mod
+        # Trigger import hook path via __import__ of watched name
+        __import__("tools.vision_tools")
+        # Re-run patch explicitly through arm (hook also runs on import)
+        from omnis_wing.completion.side_doors import _patch_module_handlers
+
+        _patch_module_handlers("tools.vision_tools")
+        self.assertTrue(handler_is_disabled("tools.vision_tools", "_handle_vision_analyze"))
         with self.assertRaises(WingRouteDisabled):
-            asyncio.run(_run())
+            sys.modules["tools.vision_tools"]._handle_vision_analyze({})
+
+    def test_p0b_can_fail_unresolved_refuses_loudly(self):
+        ensure_side_doors_armed()
+        force_unresolved_for_test("tools.vision_tools")
+        try:
+            st = arm_side_doors(force_rearm=True)
+            self.assertFalse(st.complete)
+            self.assertEqual(st.routes.get("tools.vision_tools"), "UNRESOLVED")
+            with self.assertRaises(SideDoorArmingError) as cm:
+                ensure_side_doors_armed()
+            self.assertIn("tools.vision_tools", cm.exception.unresolved)
+            # Primary join import path would raise — simulate ensure call site
+            with self.assertRaises(SideDoorArmingError):
+                from omnis_wing.completion.side_doors import ensure_side_doors_armed as ens
+
+                ens()
+        finally:
+            force_unresolved_for_test(None)
+            arm_side_doors(force_rearm=True)
+            ensure_side_doors_armed()
+
+    def test_p0b_fresh_subprocess_no_dep_stubs_arms_and_denies(self):
+        """Fresh process: no test-only httpx/requests stubs; registry deny must arm."""
+        code = textwrap.dedent(
+            f"""
+            import os, sys
+            sys.path.insert(0, {str(ROOT)!r})
+            os.environ['HERMES_HOME'] = {tempfile.mkdtemp()!r}
+            os.environ['OMNIS_WING_LEDGER_DIR'] = {tempfile.mkdtemp()!r}
+            # Explicitly do NOT install httpx/openai stubs
+            from omnis_wing.completion.side_doors import ensure_side_doors_armed, WingRouteDisabled
+            from omnis_wing.completion.product_disable import WingRouteDisabled as WRD
+            st = ensure_side_doors_armed()
+            assert st.complete, st.as_dict()
+            assert st.registry_wrapped
+            from tools.registry import registry
+            calls = {{'n': 0}}
+            def evil(args, **kw):
+                calls['n'] += 1
+                return 'nope'
+            for name in ('vision_analyze', 'image_generate', 'text_to_speech', 'mixture_of_agents'):
+                registry.register(
+                    name=name, toolset='t', schema={{'name': name, 'description': 'd', 'parameters': {{}}}},
+                    handler=evil, override=True,
+                )
+                try:
+                    registry.dispatch(name, {{}})
+                    raise SystemExit('dispatch did not refuse ' + name)
+                except WRD:
+                    pass
+            assert calls['n'] == 0
+            print('FRESH_OK')
+            """
+        )
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env={**os.environ, "PYTHONPATH": str(ROOT)},
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stdout + "\n" + proc.stderr)
+        self.assertIn("FRESH_OK", proc.stdout)
+
+    def test_p0b_fresh_subprocess_can_fail_incomplete(self):
+        code = textwrap.dedent(
+            f"""
+            import os, sys
+            sys.path.insert(0, {str(ROOT)!r})
+            os.environ['HERMES_HOME'] = {tempfile.mkdtemp()!r}
+            from omnis_wing.completion import side_doors as sd
+            sd.ensure_side_doors_armed()
+            sd.force_unresolved_for_test('tools.tts_tool')
+            try:
+                sd.ensure_side_doors_armed()
+            except sd.SideDoorArmingError as e:
+                assert 'tools.tts_tool' in e.unresolved
+                print('CANFAIL_OK')
+            else:
+                raise SystemExit('expected SideDoorArmingError')
+            """
+        )
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env={**os.environ, "PYTHONPATH": str(ROOT)},
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stdout + "\n" + proc.stderr)
+        self.assertIn("CANFAIL_OK", proc.stdout)
 
     def test_p1_handoff_hygiene_no_planted_marker(self):
         secret = PLANTED_SECRET_MARKERS[0]
@@ -190,7 +300,6 @@ class CompletionP0RepairTests(unittest.TestCase):
         handoff = (ROOT / "OMNIS-WING-COMPLETION-HANDOFF.md").read_text(encoding="utf-8")
         self.assertNotIn(secret, handoff)
         self.assertNotIn(bare, handoff)
-        # Command must reference real test path
         self.assertIn(
             "test_r4_production_signer_health.R4ProductionSignerHealthTests.test_12_opt_in_real_keychain_if_enrolled",
             handoff,

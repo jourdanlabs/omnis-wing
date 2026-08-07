@@ -20,11 +20,10 @@ Outside claim (still):
 
 from __future__ import annotations
 
-try:
-    from omnis_wing.completion.side_doors import install_side_door_guards
-    install_side_door_guards()
-except Exception:
-    pass
+# Fail closed: side-door policy must arm or import of WING join raises.
+from omnis_wing.completion.side_doors import ensure_side_doors_armed
+
+ensure_side_doors_armed()
 
 import json
 from dataclasses import dataclass
