@@ -6,7 +6,7 @@
   "claims_absolute_complete": false,
   "claims_all_hermes_chat_paths": false,
   "glass": {
-    "active_boundary": "AI EGRESS GOVERNED (R2.1 join + R3 evidence spine on that path)",
+    "active_boundary": "AI EGRESS GOVERNED (R2.1 join + R3 evidence + R4 production signer boundary on selected path)",
     "also_true": [
       "IDE-OWNED EGRESS GOVERNED \u2014 not claimed",
       "WORKSTATION EGRESS NOT GOVERNED",
@@ -125,5 +125,33 @@
       "status": "governed_r3",
       "role": "test-only pure Ed25519 backend"
     }
-  ]
+  ],
+  "governed_r4": [
+    {
+      "path": "omnis_wing/absolute/production_signer.py",
+      "status": "governed_r4",
+      "role": "R4 production signer adapter + disposable test backend"
+    },
+    {
+      "path": "omnis_wing/absolute/operator_health.py",
+      "status": "governed_r4",
+      "role": "R4 offline operator health/verifier"
+    },
+    {
+      "path": "omnis_wing/operator_cli.py",
+      "status": "governed_r4",
+      "role": "explicit enroll/status/health CLI"
+    },
+    {
+      "path": "omnis_wing/absolute/omnis_wing_keychain.swift",
+      "status": "governed_r4",
+      "role": "macOS Security bridge source (operator compile)"
+    }
+  ],
+  "r4_notes": {
+    "production_enrollment": "explicit operator only; never on startup",
+    "captain_tag": "ai.jourdanlabs.omnis-wing.terminus.r4 \u2014 tests must not touch",
+    "storage_honesty": "UNVERIFIED_AT_READ / TEST_DISPOSABLE \u2014 never invent hardware_backed=true",
+    "remote_anchor": "NOT_CONFIGURED unless local fixture explicitly passed"
+  }
 }

@@ -12,4 +12,5 @@ exec "$PY" -m unittest \
   tests.omnis_wing.test_absolute_r1 \
   tests.omnis_wing.test_r2_chat_path \
   tests.omnis_wing.test_r3_evidence_spine \
+  tests.omnis_wing.test_r4_production_signer_health \
   -v
