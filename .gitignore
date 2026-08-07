@@ -139,3 +139,4 @@ RELEASE_v*.md
 apps/desktop/demo/
 .omnis-wing-build/
 .omnis-wing-r4-gate-build/
+.omnis-wing-r41-gate-build/
