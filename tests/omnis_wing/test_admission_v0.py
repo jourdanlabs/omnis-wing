@@ -155,12 +155,27 @@ class OmnisWingV0Tests(unittest.TestCase):
         self.assertEqual(data["upstream_hermes_commit"], BASE_COMMIT)
         self.assertIn("NousResearch/Hermes-Agent", data["upstream_hermes_url"])
         self.assertEqual(data["cadmus_input_sha256"], CADMUS_SHA)
-        # fork commit must match HEAD
+        self.assertEqual(len(data["fork_commit"]), 40)
+        # fork_commit is the introduction commit (ancestor of HEAD), not a self-hashing HEAD pin
         head = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=str(ROOT), text=True
         ).strip()
-        self.assertEqual(data["fork_commit"], head)
-        self.assertEqual(len(data["fork_commit"]), 40)
+        base = data["upstream_hermes_commit"]
+        fork = data["fork_commit"]
+        # base is ancestor of fork and fork is ancestor of HEAD
+        rc1 = subprocess.call(
+            ["git", "merge-base", "--is-ancestor", base, fork], cwd=str(ROOT)
+        )
+        rc2 = subprocess.call(
+            ["git", "merge-base", "--is-ancestor", fork, head], cwd=str(ROOT)
+        )
+        self.assertEqual(rc1, 0, "upstream base must be ancestor of fork_commit")
+        self.assertEqual(rc2, 0, "fork_commit must be ancestor of HEAD")
+        # object exists
+        typ = subprocess.check_output(
+            ["git", "cat-file", "-t", fork], cwd=str(ROOT), text=True
+        ).strip()
+        self.assertEqual(typ, "commit")
 
     def test_07_no_flattering_decision_language(self):
         stub = CountingStubProvider()
