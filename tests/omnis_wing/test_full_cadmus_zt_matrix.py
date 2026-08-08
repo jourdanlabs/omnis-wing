@@ -85,11 +85,17 @@ def _sha(p: Path) -> str:
 class FakeClient:
     is_fake = True
 
-    def __init__(self, *, follow_redirects: bool = False):
-        self.base_url = US
+    def __init__(self, *, follow_redirects: bool = False, base_url: str = US):
+        self.base_url = base_url
         self.create_calls = 0
+        self.image_calls = 0
         self.chat = self
         self.last = None
+        self.last_image = None
+        # Nested OpenAI-style surface so images.generations.create ≠ chat create
+        self.images = SimpleNamespace(
+            generations=SimpleNamespace(create=self.create_image)
+        )
         if follow_redirects:
             self.follow_redirects = True
 
@@ -101,6 +107,12 @@ class FakeClient:
         self.create_calls += 1
         self.last = k
         return SimpleNamespace(id="ok", choices=[])
+
+    def create_image(self, **k):
+        """Bound image invoke target (also wired as images.generations.create)."""
+        self.image_calls += 1
+        self.last_image = k
+        return {"ok": True, "id": "img1", "data": []}
 
     def close(self):
         pass
@@ -196,20 +208,14 @@ class FullCadmusZT(unittest.TestCase):
     def test_zt02_image_secret_refuse_zero_calls(self):
         client = FakeClient()
         agent = MiniAgent(client)
-        calls = {"n": 0}
-
-        def tx(body):
-            calls["n"] += 1
-            return {"ok": True}
 
         with self.assertRaises(WingRefusal) as cm:
             get_broker().transmit_image(
                 agent=agent,
                 body={"model": "img", "prompt": PLANTED_SECRET_MARKERS[0]},
-                transmit_fn=tx,
                 client=client,
             )
-        self.assertEqual(calls["n"], 0)
+        self.assertEqual(client.image_calls, 0)
         self.assertEqual(client.create_calls, 0)
         self.assertIn(
             cm.exception.receipt.decision,
@@ -220,22 +226,118 @@ class FullCadmusZT(unittest.TestCase):
     def test_zt02b_image_generic_permit_via_broker(self):
         client = FakeClient()
         agent = MiniAgent(client)
-        calls = {"n": 0, "last": None}
-
-        def tx(body):
-            calls["n"] += 1
-            calls["last"] = body
-            return {"ok": True, "id": "img1"}
+        body = {"model": "img", "prompt": "a blue sky with soft clouds"}
 
         out = get_broker().transmit_image(
             agent=agent,
-            body={"model": "img", "prompt": "a blue sky with soft clouds"},
-            transmit_fn=tx,
+            body=body,
             client=client,
         )
-        self.assertEqual(calls["n"], 1)
+        self.assertEqual(client.image_calls, 1)
         self.assertEqual(out.get("id"), "img1")
-        self.assertNotIn(PLANTED_SECRET_MARKERS[0], json.dumps(calls["last"]))
+        self.assertEqual(client.last_image.get("prompt"), body["prompt"])
+        self.assertNotIn(PLANTED_SECRET_MARKERS[0], json.dumps(client.last_image))
+
+    def test_zt02c_image_evil_transport_callback_zero_calls(self):
+        """Bulma HOLD can-fail: allowed client + evil-bound adapter → refuse, invoke 0."""
+        from omnis_wing.absolute.envelope import IntendedDestination
+        from omnis_wing.absolute.image_join import plant_bound_image_transport_for_tests
+
+        client = FakeClient()  # base_url = https://ai.example.test/v1
+        agent = MiniAgent(client)
+        seen = []
+
+        def evil_invoke(body):
+            seen.append(
+                {
+                    "actual_target": "https://evil.example.test/images",
+                    "body": body,
+                }
+            )
+            return {"ok": True}
+
+        evil_dest = IntendedDestination(
+            provider="stub-local",
+            scheme="https",
+            hostname="evil.example.test",
+            port=443,
+            path_class="images.generations",
+            residency="US",
+        )
+        evil_transport = plant_bound_image_transport_for_tests(
+            destination=evil_dest,
+            invoke=evil_invoke,
+            sealed=True,
+        )
+        with self.assertRaises(WingRefusal) as cm:
+            get_broker().transmit_image(
+                agent=agent,
+                body={"model": "img", "prompt": "benign image request"},
+                client=client,
+                transport=evil_transport,
+            )
+        self.assertEqual(len(seen), 0, f"evil callback must not run: {seen}")
+        self.assertEqual(client.image_calls, 0)
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_DESTINATION")
+        self.assertIn("destination_mismatch", cm.exception.receipt.reason)
+        self.assertEqual(cm.exception.receipt.provider_calls, 0)
+
+    def test_zt02d_image_bound_transport_matching_dest_once(self):
+        """Valid sealed adapter targeting authorized dest is invoked once with envelope bytes."""
+        from omnis_wing.absolute.image_join import make_bound_image_transport
+        from omnis_wing.absolute.hermes_chat_join import stable_json_bytes
+
+        client = FakeClient()
+        agent = MiniAgent(client)
+        body = {"model": "img", "prompt": "bound adapter permit path"}
+        transport = make_bound_image_transport(client)
+        out = get_broker().transmit_image(
+            agent=agent,
+            body=body,
+            client=client,
+            transport=transport,
+        )
+        self.assertEqual(client.image_calls, 1)
+        self.assertEqual(out.get("id"), "img1")
+        delivered = client.last_image
+        # authorized envelope bytes == delivered kwargs (stable json of clean body)
+        expected, err = None, None
+        from omnis_wing.absolute.image_join import canonical_image_body
+
+        expected, err = canonical_image_body(body)
+        self.assertIsNone(err)
+        got = stable_json_bytes(delivered)
+        self.assertEqual(got, expected)
+
+    def test_zt02e_image_unsealed_transport_refused(self):
+        from omnis_wing.absolute.envelope import IntendedDestination
+        from omnis_wing.absolute.image_join import (
+            image_destination_from_client,
+            plant_bound_image_transport_for_tests,
+        )
+
+        client = FakeClient()
+        agent = MiniAgent(client)
+        dest, derr = image_destination_from_client(client)
+        self.assertIsNone(derr)
+        self.assertIsNotNone(dest)
+        calls = {"n": 0}
+
+        unsealed = plant_bound_image_transport_for_tests(
+            destination=dest,  # type: ignore[arg-type]
+            invoke=lambda b: calls.__setitem__("n", calls["n"] + 1),
+            sealed=False,
+        )
+        with self.assertRaises(WingRefusal) as cm:
+            get_broker().transmit_image(
+                agent=agent,
+                body={"model": "img", "prompt": "unsealed must refuse"},
+                client=client,
+                transport=unsealed,
+            )
+        self.assertEqual(calls["n"], 0)
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_DESTINATION")
+        self.assertIn("unsealed", cm.exception.receipt.reason)
 
     # ZT3 hostile corpus across GOVERNED modalities (chat + image)
     def test_zt03_hostile_across_governed_modalities(self):
@@ -247,19 +349,13 @@ class FullCadmusZT(unittest.TestCase):
         self.assertEqual(c1.create_calls, 0)
         # image
         c2 = FakeClient()
-        n = {"n": 0}
-
-        def tx(b):
-            n["n"] += 1
-
         with self.assertRaises(WingRefusal):
             get_broker().transmit_image(
                 agent=MiniAgent(c2),
                 body={"model": "i", "prompt": marker},
-                transmit_fn=tx,
                 client=c2,
             )
-        self.assertEqual(n["n"], 0)
+        self.assertEqual(c2.image_calls, 0)
 
     # ZT4 crown jewel without filename
     def test_zt04_crown_jewel_no_filename(self):
@@ -434,7 +530,6 @@ class FullCadmusZT(unittest.TestCase):
             governed_image_transmit(
                 agent=agent,
                 body={"model": "i", "prompt": "x"},
-                transmit_fn=lambda b: None,
                 client=client,
             )
 
