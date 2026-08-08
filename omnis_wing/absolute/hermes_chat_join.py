@@ -548,13 +548,19 @@ def governed_chat_completions_create(
     *,
     broker: Optional[ChatCompletionsClientBroker] = None,
 ) -> Any:
-    """Sole outbound join for selected non-streaming chat_completions path.
+    """Internal join implementation — callable only under TransportBroker scope.
+
+    Agent modules must use ``get_broker().transmit_chat_completions``. Direct
+    import/call from agent trees is a BrokerViolation (runtime + source guard).
 
     R3.1 evidence integrity:
     - Signer must be available before any client call.
     - Durable signed pre-send (TRANSMISSION_STARTED) before broker.transmit.
     - Terminal signed evidence after call; failure → OutcomeUnknownError, not success.
     """
+    from omnis_wing.absolute.broker_guard import require_broker_dispatch
+
+    require_broker_dispatch("governed_chat_completions_create")
     evidence = _resolve_evidence(wing_ctx)
     if evidence is None or evidence.signer is None or not evidence.signer.available():
         early = _refusal_receipt(

@@ -1,15 +1,18 @@
 """M2 TransportBroker — sole owner of outbound provider transmits on WING fork.
 
 No other module may own an outbound provider socket/client call for AI payload
-routes. All GOVERNED routes enter here.
+routes. All GOVERNED routes enter here. Governed implementation functions are
+not public agent API — they are reachable only while this broker holds the
+dispatch scope (runtime gate) and agent trees must not import them (source guard).
 """
 
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Set
+from dataclasses import dataclass
+from typing import Any, Callable, Optional, Set
 
+from omnis_wing.absolute.broker_guard import BrokerViolation, broker_dispatch_scope
 from omnis_wing.absolute.universal_egress import (
     governed_callable_transmit,
     governed_streaming_create,
@@ -19,21 +22,27 @@ from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_creat
 _lock = threading.RLock()
 _REGISTERED_TRANSPORTS: Set[str] = set()
 
-
-class BrokerViolation(RuntimeError):
-    """Raised when a non-broker path attempts provider ownership."""
+__all__ = [
+    "BrokerViolation",
+    "TransportBroker",
+    "get_broker",
+    "assert_broker_only_import",
+    "broker_seen_routes",
+    "reset_broker_for_tests",
+]
 
 
 @dataclass
 class TransportBroker:
-    """Process-wide singleton facade for AI egress."""
+    """Process-wide singleton — owns final provider dispatch for AI egress."""
 
     _instance_id: str = "wing-transport-broker-v1"
 
     def transmit_chat_completions(self, client: Any, api_kwargs: dict, wing_ctx: Any) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add("chat_completions")
-        return governed_chat_completions_create(client, api_kwargs, wing_ctx)
+        with broker_dispatch_scope():
+            return governed_chat_completions_create(client, api_kwargs, wing_ctx)
 
     def transmit_callable(
         self,
@@ -48,22 +57,31 @@ class TransportBroker:
     ) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
-        return governed_callable_transmit(
-            agent=agent,
-            body=body,
-            transmit_fn=transmit_fn,
-            client=client,
-            path_class=path_class,
-            route_id=route_id,
-            wing_ctx=wing_ctx,
-        )
+        with broker_dispatch_scope():
+            return governed_callable_transmit(
+                agent=agent,
+                body=body,
+                transmit_fn=transmit_fn,
+                client=client,
+                path_class=path_class,
+                route_id=route_id,
+                wing_ctx=wing_ctx,
+            )
 
-    def transmit_streaming(self, *, agent: Any, client: Any, api_kwargs: dict, route_id: str = "stream") -> Any:
+    def transmit_streaming(
+        self,
+        *,
+        agent: Any,
+        client: Any,
+        api_kwargs: dict,
+        route_id: str = "stream",
+    ) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
-        return governed_streaming_create(
-            agent=agent, client=client, api_kwargs=api_kwargs, route_id=route_id
-        )
+        with broker_dispatch_scope():
+            return governed_streaming_create(
+                agent=agent, client=client, api_kwargs=api_kwargs, route_id=route_id
+            )
 
 
 _BROKER: Optional[TransportBroker] = None
@@ -75,6 +93,14 @@ def get_broker() -> TransportBroker:
         if _BROKER is None:
             _BROKER = TransportBroker()
         return _BROKER
+
+
+def reset_broker_for_tests() -> None:
+    """Drop singleton + seen routes. Tests only."""
+    global _BROKER
+    with _lock:
+        _BROKER = None
+        _REGISTERED_TRANSPORTS.clear()
 
 
 def assert_broker_only_import(module_name: str, attr: str) -> None:

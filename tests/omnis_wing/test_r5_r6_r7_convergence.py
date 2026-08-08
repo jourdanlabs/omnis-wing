@@ -22,7 +22,7 @@ _tmp = tempfile.mkdtemp(prefix="wing-r5r7-")
 os.environ["HERMES_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "ledgers")
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 
 for _n in ("requests", "yaml"):
     if _n not in sys.modules:
@@ -30,6 +30,10 @@ for _n in ("requests", "yaml"):
         if _n == "yaml":
             m.safe_load = lambda s: {}
         sys.modules[_n] = m
+
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
 
 from agent.chat_completion_helpers import (  # noqa: E402
     interruptible_api_call,
@@ -46,10 +50,7 @@ from omnis_wing.absolute.receipt_spine import (  # noqa: E402
     make_test_signer,
 )
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
-from omnis_wing.absolute.universal_egress import (  # noqa: E402
-    governed_callable_transmit,
-    governed_streaming_create,
-)
+from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.absolute.operator_health import build_health_report  # noqa: E402
 from omnis_wing.completion.product_disable import load_manifest  # noqa: E402
 
@@ -149,8 +150,9 @@ def _kw(content="hello operator", **extra):
 class R5PayloadPolicyTests(unittest.TestCase):
     def setUp(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
         os.environ.pop("OMNIS_WING_PRODUCTION_CONFIG", None)
+        bootstrap_wing_test_env()
 
     def test_00_cadmus(self):
         self.assertTrue(CADMUS.is_file())
@@ -171,51 +173,41 @@ class R5PayloadPolicyTests(unittest.TestCase):
     def test_r5_project_in_system_field_refuse(self):
         client = FakeClient()
         agent = MiniAgent(client)
-        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
-        try:
-            body = _kw("hi")
-            body["system"] = "See /Users/x/chamber/SOUL.md and def classify():\n  pass"
-            with self.assertRaises(WingRefusal) as cm:
-                interruptible_api_call(agent, body)
-            self.assertEqual(cm.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
-            self.assertEqual(client.create_calls, 0)
-        finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        body = _kw("hi")
+        body["system"] = "See /Users/x/chamber/SOUL.md and def classify():\n  pass"
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(agent, body)
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
+        self.assertEqual(client.create_calls, 0)
 
     def test_r5_tool_arguments_project_refuse(self):
         client = FakeClient()
         agent = MiniAgent(client)
-        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
-        try:
-            body = _kw("hi")
-            body["tools"] = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "x",
-                        "description": "import os\nfrom pathlib import Path  # jourdanlabs",
-                        "parameters": {},
-                    },
-                }
-            ]
-            with self.assertRaises(WingRefusal) as cm:
-                interruptible_api_call(agent, body)
-            self.assertEqual(cm.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
-            self.assertEqual(client.create_calls, 0)
-        finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        body = _kw("hi")
+        body["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "x",
+                    "description": "import os\nfrom pathlib import Path  # jourdanlabs",
+                    "parameters": {},
+                },
+            }
+        ]
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(agent, body)
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
+        self.assertEqual(client.create_calls, 0)
 
     def test_r5_unknown_provenance_refuse(self):
         client = FakeClient()
         agent = MiniAgent(client)
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "unknown"
-        try:
-            with self.assertRaises(WingRefusal) as cm:
-                interruptible_api_call(agent, _kw())
-            self.assertEqual(cm.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
-            self.assertEqual(client.create_calls, 0)
-        finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        # high binary ratio → unknown classification without env override
+        blob = bytes([0, 1, 2, 255, 254, 253] * 80).decode("latin-1")
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(agent, _kw(blob))
+        self.assertEqual(cm.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
+        self.assertEqual(client.create_calls, 0)
 
     def test_r5_scanner_failure_refuse(self):
         from omnis_wing.absolute.envelope import OutboundEnvelope, IntendedDestination, SourceProvenance
@@ -279,8 +271,9 @@ class R5PayloadPolicyTests(unittest.TestCase):
 class R6PrimaryPathTests(unittest.TestCase):
     def setUp(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
         os.environ.pop("OMNIS_WING_PRODUCTION_CONFIG", None)
+        bootstrap_wing_test_env()
 
     def test_r6_openai_non_stream_governed(self):
         client = FakeClient()
@@ -313,7 +306,7 @@ class R6PrimaryPathTests(unittest.TestCase):
         try:
             body = _kw()
             body["stream"] = True
-            governed_streaming_create(agent=agent, client=client, api_kwargs=body)
+            get_broker().transmit_streaming(agent=agent, client=client, api_kwargs=body)
         finally:
             rs.EvidenceLedger.append = orig  # type: ignore
         self.assertIn("provider", order)
@@ -333,7 +326,7 @@ class R6PrimaryPathTests(unittest.TestCase):
             calls["n"] += 1
             return SimpleNamespace(id="a")
 
-        governed_callable_transmit(
+        get_broker().transmit_callable(
             agent=agent,
             body=_kw(),
             transmit_fn=tx,
@@ -352,7 +345,7 @@ class R6PrimaryPathTests(unittest.TestCase):
             calls["n"] += 1
             return {"ok": True}
 
-        governed_callable_transmit(
+        get_broker().transmit_callable(
             agent=agent,
             body={"modelId": "x", "messages": [{"role": "user", "content": [{"text": "hi"}]}]},
             transmit_fn=tx,
@@ -372,7 +365,7 @@ class R6PrimaryPathTests(unittest.TestCase):
             calls["n"] += 1
             return SimpleNamespace(id="c")
 
-        governed_callable_transmit(
+        get_broker().transmit_callable(
             agent=agent,
             body={"model": "codex", "input": "hi"},
             transmit_fn=tx,
@@ -387,14 +380,15 @@ class R6PrimaryPathTests(unittest.TestCase):
         body = _kw(PLANTED_SECRET_MARKERS[0])
         body["stream"] = True
         with self.assertRaises(WingRefusal):
-            governed_streaming_create(agent=agent, client=client, api_kwargs=body)
+            get_broker().transmit_streaming(agent=agent, client=client, api_kwargs=body)
         self.assertEqual(client.create_calls, 0)
 
 
 class R7CoverageAdversarialTests(unittest.TestCase):
     def setUp(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
+        bootstrap_wing_test_env()
 
     def tearDown(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"

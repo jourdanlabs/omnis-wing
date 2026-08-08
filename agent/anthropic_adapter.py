@@ -2587,7 +2587,7 @@ def create_anthropic_message(
 
     create_kwargs = dict(api_kwargs)
     create_kwargs.pop("stream", None)
-    # OMNIS WING: if already inside governed_callable_transmit, transmit is the create.
+    # OMNIS WING: if already inside governed transmit, transmit is the create.
     # Direct create_anthropic_message from ungated callers still must not bypass.
     from omnis_wing.absolute.runtime_context import get_wing_agent
     from omnis_wing.completion.product_disable import WingRouteDisabled
@@ -2602,7 +2602,7 @@ def create_anthropic_message(
     # Detect nested re-entry via flag.
     if getattr(agent, "_wing_in_governed_transmit", False):
         return messages_api.create(**create_kwargs)
-    from omnis_wing.absolute.universal_egress import governed_callable_transmit
+    from omnis_wing.absolute.transport_broker import get_broker
     from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
     ensure_agent_wing_context(agent, create_kwargs)
 
@@ -2613,7 +2613,7 @@ def create_anthropic_message(
         finally:
             agent._wing_in_governed_transmit = False
 
-    return governed_callable_transmit(
+    return get_broker().transmit_callable(
         agent=agent,
         body=create_kwargs,
         transmit_fn=_tx,

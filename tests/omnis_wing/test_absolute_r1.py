@@ -12,6 +12,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
+
 from omnis_wing.absolute.coverage import assert_manifest_honest, governed_module_paths, load_manifest
 from omnis_wing.absolute.envelope import (
     IntendedDestination,

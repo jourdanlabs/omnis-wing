@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
 
 _tmp_home = tempfile.mkdtemp(prefix="omnis-wing-r2-home-")
 os.environ["HERMES_HOME"] = _tmp_home
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 for _name in ("requests", "yaml"):
     if _name not in sys.modules:
         _m = types.ModuleType(_name)
@@ -27,6 +28,11 @@ for _name in ("requests", "yaml"):
                 return {}
             _m.safe_load = _safe_load  # type: ignore[attr-defined]
         sys.modules[_name] = _m
+
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
+os.environ.setdefault("OMNIS_WING_SIGNER_MODE", "test")
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.envelope import IntendedDestination, SourceProvenance  # noqa: E402
@@ -37,9 +43,9 @@ from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
     canonical_messages_payload_bytes,
     canonical_provider_request_body,
     derive_destination_from_client,
-    governed_chat_completions_create,
     stable_json_bytes,
 )
+from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 from omnis_wing.absolute.receipt_spine import EvidenceLedger, make_test_signer  # noqa: E402
 
@@ -198,28 +204,19 @@ class WingR2ChatPathTests(unittest.TestCase):
         self.assertEqual(client.create_calls, 0)
 
     def test_02_real_path_missing_provenance_refuse_zero_calls(self):
-        # R5: unknown provenance (forced) refuses SOURCE_POLICY; empty wing sources
-        # are rebuilt from body (generic operator text may permit under force generic).
-        import os
+        # R5: unknown provenance via high-binary content refuses SOURCE_POLICY.
         client2 = FakeClient(base_url=US_BASE)
-        prev = os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION")
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "unknown"
-        try:
-            with self.assertRaises(WingRefusal) as cm2:
-                interruptible_api_call(
-                    MiniAgent(
-                        WingEgressContext(sources=(), evidence=_evidence()),
-                        client2,
-                    ),
-                    _api_kwargs(),
-                )
-            self.assertEqual(cm2.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
-            self.assertEqual(client2.create_calls, 0)
-        finally:
-            if prev is None:
-                os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
-            else:
-                os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = prev
+        blob = bytes([0, 1, 2, 255, 254] * 90).decode("latin-1")
+        with self.assertRaises(WingRefusal) as cm2:
+            interruptible_api_call(
+                MiniAgent(
+                    WingEgressContext(sources=(), evidence=_evidence()),
+                    client2,
+                ),
+                _api_kwargs(messages=[{"role": "user", "content": blob}]),
+            )
+        self.assertEqual(cm2.exception.receipt.decision, "REFUSE_SOURCE_POLICY")
+        self.assertEqual(client2.create_calls, 0)
 
         # Unavailable signer still refuses before client
         from omnis_wing.absolute.receipt_spine import UnavailableSigner, EvidenceLedger
@@ -258,11 +255,13 @@ class WingR2ChatPathTests(unittest.TestCase):
         rest = src[start + 1 :]
         next_def = rest.index("\ndef ")
         body = src[start : start + 1 + next_def]
-        self.assertIn("governed_chat_completions_create", body)
+        self.assertIn("get_broker", body)
+        self.assertIn("transmit_chat_completions", body)
+        self.assertNotIn("governed_chat_completions_create", body)
         self.assertNotIn("request_client.chat.completions.create(**api_kwargs)", body)
 
         client = FakeClient(base_url=US_BASE)
-        out = governed_chat_completions_create(client, _api_kwargs(), _ctx("generic"))
+        out = get_broker().transmit_chat_completions(client, _api_kwargs(), _ctx("generic"))
         self.assertIsNotNone(out)
         self.assertEqual(client.create_calls, 1)
 
@@ -319,7 +318,7 @@ class WingR2ChatPathTests(unittest.TestCase):
         api_kw = _api_kwargs(custom_provider_extension={"x": 1})
         client = FakeClient(base_url=US_BASE)
         with self.assertRaises(WingRefusal) as cm:
-            governed_chat_completions_create(client, api_kw, _ctx("generic"))
+            get_broker().transmit_chat_completions(client, api_kw, _ctx("generic"))
         self.assertEqual(cm.exception.receipt.decision, "REFUSE_UNSUPPORTED")
         self.assertEqual(client.create_calls, 0)
 
@@ -373,7 +372,7 @@ class WingR2ChatPathTests(unittest.TestCase):
         api_kw = _api_kwargs(tools=[{"type": "function", "function": {"name": "a", "description": secret}}])
         client = FakeClient(base_url=US_BASE)
         with self.assertRaises(WingRefusal):
-            governed_chat_completions_create(client, api_kw, _ctx("generic"))
+            get_broker().transmit_chat_completions(client, api_kw, _ctx("generic"))
         self.assertEqual(client.create_calls, 0)
 
 

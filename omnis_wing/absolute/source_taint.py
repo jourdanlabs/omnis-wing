@@ -8,7 +8,6 @@ required for secret/credential protection.
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -65,11 +64,13 @@ def _d(data: bytes) -> str:
 
 
 def classify_content_bytes(data: bytes, *, path_hint: str = "") -> TaintRecord:
-    """Classify bytes by content. Filename is advisory only, never sole authority."""
-    force = (os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION") or "").strip().lower()
+    """Classify bytes by content. Filename is advisory only, never sole authority.
+
+    No ambient environment override. Classification is automatic and fail-closed.
+    """
     dig = _d(data)
 
-    # Credentials / secrets — never overridden by force except after detection
+    # Credentials / secrets first — never washable
     if _PEM_RE.search(data) or _AWS_KEY_RE.search(data) or _CONN_RE.search(data):
         return TaintRecord(dig, "credential", True, False, path_hint or "content:credential")
     for m in PLANTED_SECRET_MARKERS:
@@ -88,15 +89,6 @@ def classify_content_bytes(data: bytes, *, path_hint: str = "") -> TaintRecord:
     path_project = any(
         x in path_l for x in (".env", "id_rsa", "credentials", "secret", "chamber", "omnis")
     )
-
-    if force in ("generic", "project", "protected", "unknown", "credential"):
-        return TaintRecord(
-            dig,
-            force,
-            force != "generic",
-            force == "protected",
-            path_hint or f"force:{force}",
-        )
 
     if _PROJECT_RE.search(data) or path_project:
         return TaintRecord(dig, "project", True, False, path_hint or "content:project")

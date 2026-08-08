@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 os.environ["HERMES_HOME"] = tempfile.mkdtemp(prefix="wing-comp-home-")
 os.environ["OMNIS_WING_LEDGER_DIR"] = tempfile.mkdtemp(prefix="wing-comp-led-")
-os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
 for _n in ("requests", "yaml"):
     if _n not in sys.modules:
@@ -27,10 +27,14 @@ for _n in ("requests", "yaml"):
             m.safe_load = lambda s: {}
         sys.modules[_n] = m
 
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
+
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.auto_provenance import auto_wing_context, ensure_agent_wing_context  # noqa: E402
-from omnis_wing.absolute.universal_egress import governed_callable_transmit  # noqa: E402
+from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.completion.product_disable import load_manifest, WingRouteDisabled  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 
@@ -131,20 +135,24 @@ class CompletionRouteTests(unittest.TestCase):
         self.assertIsNotNone(getattr(agent, "wing_egress_context", None))
 
     def test_03_protected_cn_auto_refuse(self):
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "project"
-        try:
-            client = FakeClient(CN)
-            agent = MiniAgent(client)
-            with self.assertRaises(Exception) as cm:
-                # WingRefusal bubbles as error in worker - may be Interrupted or stored
-                interruptible_api_call(
-                    agent,
-                    {"model": "m", "messages": [{"role": "user", "content": "sec"}], "temperature": 0},
-                )
-            # Either raises WingRefusal to caller or swallows into result - check client 0
-            self.assertEqual(client.create_calls, 0)
-        finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        client = FakeClient(CN)
+        agent = MiniAgent(client)
+        with self.assertRaises(Exception):
+            # project-classified body to CN residency must refuse before provider
+            interruptible_api_call(
+                agent,
+                {
+                    "model": "m",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": 'def proprietary_engine():\n    return "jourdanlabs internal"\n',
+                        }
+                    ],
+                    "temperature": 0,
+                },
+            )
+        self.assertEqual(client.create_calls, 0)
 
     def test_04_secret_in_body_refuse(self):
         client = FakeClient(US)
@@ -197,7 +205,7 @@ class CompletionRouteTests(unittest.TestCase):
             return SimpleNamespace(ok=True)
 
         ensure_agent_wing_context(agent, body)
-        governed_callable_transmit(
+        get_broker().transmit_callable(
             agent=agent, body=body, transmit_fn=tx, client=client, route_id="test"
         )
         self.assertEqual(calls["n"], 1)

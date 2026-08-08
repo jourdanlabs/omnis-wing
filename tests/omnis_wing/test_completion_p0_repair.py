@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 _tmp = tempfile.mkdtemp(prefix="wing-p0-")
 os.environ["HERMES_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = tempfile.mkdtemp(prefix="wing-p0-led-")
-os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
 
 for _n in ("requests", "yaml"):
@@ -29,6 +29,10 @@ for _n in ("requests", "yaml"):
         if _n == "yaml":
             m.safe_load = lambda s: {}
         sys.modules[_n] = m
+
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
 
 from omnis_wing.absolute.auto_provenance import resolve_evidence_session  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402

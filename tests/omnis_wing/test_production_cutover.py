@@ -22,7 +22,7 @@ os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "ledgers")
 os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
 os.environ.pop("OMNIS_WING_PRODUCTION_CONFIG", None)
 os.environ.pop("OMNIS_WING_SIGNER_BACKEND", None)
-os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 
 for _n in ("requests", "yaml"):
     if _n not in sys.modules:
@@ -149,11 +149,14 @@ class ProductionCutoverTests(unittest.TestCase):
             "OMNIS_WING_LEDGER_DIR_OVERRIDE",
         ):
             os.environ.pop(k, None)
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
         self.td = Path(tempfile.mkdtemp(prefix="wing-pc-"))
         os.environ["OMNIS_WING_LEDGER_DIR"] = str(self.td / "ledgers")
         # default test mode unless a production test overrides
         os.environ.setdefault("OMNIS_WING_SIGNER_MODE", "test")
+        from tests.omnis_wing._fixtures import bootstrap_wing_test_env
+
+        bootstrap_wing_test_env()
 
     def tearDown(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"

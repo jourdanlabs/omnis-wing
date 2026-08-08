@@ -196,7 +196,13 @@ def governed_callable_transmit(
     route_id: str = "universal",
     wing_ctx: Optional[WingEgressContext] = None,
 ) -> Any:
-    """One door: canonicalize → auto provenance → pre-send evidence → transmit → terminal."""
+    """Internal join — only under TransportBroker dispatch scope.
+
+    Agent modules must use ``get_broker().transmit_callable``.
+    """
+    from omnis_wing.absolute.broker_guard import require_broker_dispatch
+
+    require_broker_dispatch("governed_callable_transmit")
     if wing_ctx is None and agent is not None:
         wing_ctx = ensure_agent_wing_context(agent, body)
     evidence = wing_ctx.evidence if wing_ctx else None
@@ -360,7 +366,10 @@ def governed_streaming_create(
     api_kwargs: dict,
     route_id: str = "agent.interruptible_streaming.chat_completions",
 ) -> Any:
-    """Govern the initial streaming create; stream iteration remains local after PERMIT."""
+    """Internal streaming join — only under TransportBroker dispatch scope."""
+    from omnis_wing.absolute.broker_guard import require_broker_dispatch
+
+    require_broker_dispatch("governed_streaming_create")
     body = dict(api_kwargs)
     body["__wing_allow_stream_flag"] = True
 
@@ -369,6 +378,7 @@ def governed_streaming_create(
         kw = {k: v for k, v in authorized_body.items() if not str(k).startswith("__wing")}
         return client.chat.completions.create(**kw)
 
+    # Nested governed_callable_transmit shares the same broker scope (depth >= 1).
     return governed_callable_transmit(
         agent=agent,
         body=body,

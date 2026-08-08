@@ -20,12 +20,18 @@ if str(ROOT) not in sys.path:
 
 _tmp_home = tempfile.mkdtemp(prefix="omnis-wing-r3-home-")
 os.environ["HERMES_HOME"] = _tmp_home
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 for _name in ("requests", "yaml"):
     if _name not in sys.modules:
         _m = types.ModuleType(_name)
         if _name == "yaml":
             _m.safe_load = lambda stream: {}  # type: ignore
         sys.modules[_name] = _m
+
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
+os.environ.setdefault("OMNIS_WING_SIGNER_MODE", "test")
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.envelope import SourceProvenance  # noqa: E402
@@ -34,8 +40,8 @@ from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
     OutcomeUnknownError,
     WingEgressContext,
     WingRefusal,
-    governed_chat_completions_create,
 )
+from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.absolute.receipt_spine import (  # noqa: E402
     EvidenceLedger,
     UnavailableSigner,
@@ -187,7 +193,7 @@ class R3EvidenceTests(unittest.TestCase):
     def test_03_one_byte_receipt_mutation_fails_verify(self):
         ev = _session(self.td)
         ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
-        governed_chat_completions_create(FakeClient(US_BASE), _api_kwargs(), ctx)
+        get_broker().transmit_chat_completions(FakeClient(US_BASE), _api_kwargs(), ctx)
         signed = ev.last_signed.to_dict()
         # mutate one byte in signature
         hx = signed["signature_hex"]
@@ -202,7 +208,7 @@ class R3EvidenceTests(unittest.TestCase):
     def test_04_ledger_rewrite_fails_anchor(self):
         ev = _session(self.td)
         ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
-        governed_chat_completions_create(FakeClient(US_BASE), _api_kwargs(), ctx)
+        get_broker().transmit_chat_completions(FakeClient(US_BASE), _api_kwargs(), ctx)
         anchor_path = self.td / "anchor.json"
         write_anchor(
             anchor_path,
@@ -219,7 +225,7 @@ class R3EvidenceTests(unittest.TestCase):
         other_dir.mkdir()
         ev2 = _session(other_dir)
         ctx2 = WingEgressContext(sources=(_src("generic"),), evidence=ev2)
-        governed_chat_completions_create(FakeClient(US_BASE), _api_kwargs(), ctx2)
+        get_broker().transmit_chat_completions(FakeClient(US_BASE), _api_kwargs(), ctx2)
         # copy other ledger over original
         shutil.copy(ev2.ledger.path, ev.ledger.path)
         ok2, reason = verify_anchor(anchor_path, ev.ledger)
@@ -290,7 +296,7 @@ class R3EvidenceTests(unittest.TestCase):
         # Also via receipt path
         ev = _session(self.td)
         ctx = WingEgressContext(sources=(_src("generic"),), evidence=ev)
-        governed_chat_completions_create(FakeClient(US_BASE), _api_kwargs(), ctx)
+        get_broker().transmit_chat_completions(FakeClient(US_BASE), _api_kwargs(), ctx)
         d = ev.last_signed.to_dict()
         hx = d["signature_hex"]
         raw = bytes.fromhex(hx)

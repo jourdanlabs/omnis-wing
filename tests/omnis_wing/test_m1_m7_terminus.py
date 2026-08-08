@@ -19,8 +19,7 @@ _tmp = tempfile.mkdtemp(prefix="wing-m17-")
 os.environ["HERMES_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "led")
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
-os.environ.pop("OMNIS_WING_POLICY_PATH", None)
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 os.environ.pop("OMNIS_WING_ANCHOR_PATH", None)
 
 for _n in ("requests", "yaml"):
@@ -29,6 +28,10 @@ for _n in ("requests", "yaml"):
         if _n == "yaml":
             m.safe_load = lambda s: {}
         sys.modules[_n] = m
+
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
@@ -124,7 +127,8 @@ def _kw(content="hello", **extra):
 class M1TaintTests(unittest.TestCase):
     def setUp(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
+        bootstrap_wing_test_env()
 
     def test_00_cadmus(self):
         self.assertTrue(CADMUS.is_file())
@@ -142,13 +146,8 @@ class M1TaintTests(unittest.TestCase):
 
     def test_m1_taint_survives_summary(self):
         parent = classify_content_bytes(b"OMNIS_WING_PROTECTED_FRAGMENT secret sauce")
-        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
-        try:
-            parent = classify_content_bytes(b"OMNIS_WING_PROTECTED_FRAGMENT secret sauce")
-            _, summ = taint_summarize(b"orig", "innocent paraphrase of the thing", parent)
-            self.assertIn(summ.classification, ("protected", "project", "credential"))
-        finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        _, summ = taint_summarize(b"orig", "innocent paraphrase of the thing", parent)
+        self.assertIn(summ.classification, ("protected", "project", "credential"))
 
     def test_m1_split_secret_reformed_in_concat(self):
         marker = PLANTED_SECRET_MARKERS[0]
@@ -170,37 +169,32 @@ class M1TaintTests(unittest.TestCase):
     def test_m1_file_read_env(self):
         td = Path(tempfile.mkdtemp())
         env = td / ".env"
-        env.write_text("export OPENAI_API_KEY=sk-test-not-real-1234567890abcd\n")
-        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
+        env.write_text("export OPENAI_API_KEY=sk-tes...abcd\n")
         try:
             _, rec = read_file_with_provenance(env, root=td)
             self.assertIn(rec.classification, ("credential", "protected"))
         finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
             shutil.rmtree(td, ignore_errors=True)
 
     def test_m1_protected_omitted_filename_refuses_provider(self):
         client = FakeClient()
         agent = MiniAgent(client)
-        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
-        try:
-            with self.assertRaises(WingRefusal) as cm:
-                interruptible_api_call(
-                    agent, _kw("OMNIS_WING_PROTECTED_FRAGMENT in body without path")
-                )
-            self.assertIn(
-                cm.exception.receipt.decision,
-                ("REFUSE_SOURCE_POLICY", "REFUSE_CROWN_JEWEL", "REFUSE_SECRET"),
+        with self.assertRaises(WingRefusal) as cm:
+            interruptible_api_call(
+                agent, _kw("OMNIS_WING_PROTECTED_FRAGMENT in body without path")
             )
-            self.assertEqual(client.create_calls, 0)
-        finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        self.assertIn(
+            cm.exception.receipt.decision,
+            ("REFUSE_SOURCE_POLICY", "REFUSE_CROWN_JEWEL", "REFUSE_SECRET"),
+        )
+        self.assertEqual(client.create_calls, 0)
 
 
 class M2BrokerTests(unittest.TestCase):
     def setUp(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
+        bootstrap_wing_test_env()
 
     def test_m2_manifest_states(self):
         man = load_manifest()
@@ -257,21 +251,31 @@ class M5AnchorTests(unittest.TestCase):
 
 
 class M6PolicyGlassTests(unittest.TestCase):
+    def setUp(self):
+        bootstrap_wing_test_env()
+
     def test_m6_default_policy_enforce(self):
         p = load_policy()
         self.assertEqual(p.mode, "enforce")
+        self.assertTrue(p.signature_valid)
         self.assertTrue(p.policy_digest)
 
     def test_m6_off_forbidden(self):
+        from omnis_wing.absolute.signed_policy import write_test_policy_file
+
         td = Path(tempfile.mkdtemp())
-        pf = td / "p.json"
-        pf.write_text(json.dumps({"mode": "off", "policy_version": "x"}))
-        os.environ["OMNIS_WING_POLICY_PATH"] = str(pf)
         try:
+            # unsigned off document must refuse; also signed off is forbidden
+            pf = td / "p.json"
+            pf.write_text(json.dumps({"mode": "off", "policy_version": "x"}))
+            os.environ["OMNIS_WING_POLICY_PATH"] = str(pf)
+            with self.assertRaises(PolicyError):
+                load_policy()
+            write_test_policy_file(pf, overrides={"mode": "off"}, install_trust=True)
             with self.assertRaises(PolicyError):
                 load_policy()
         finally:
-            os.environ.pop("OMNIS_WING_POLICY_PATH", None)
+            bootstrap_wing_test_env(force=True)
             shutil.rmtree(td, ignore_errors=True)
 
     def test_m6_glass_red_without_signer(self):
@@ -291,7 +295,8 @@ class M6PolicyGlassTests(unittest.TestCase):
 class M7PreflightTests(unittest.TestCase):
     def setUp(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-        os.environ.pop("OMNIS_WING_POLICY_PATH", None)
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
+        bootstrap_wing_test_env(force=True)
 
     def test_m7_preflight_test_mode_ok(self):
         r = run_preflight()
@@ -299,38 +304,36 @@ class M7PreflightTests(unittest.TestCase):
         self.assertIn("glass", r.glass)
 
     def test_m7_deny_all_blocks(self):
+        from omnis_wing.absolute.signed_policy import write_test_policy_file
+
         td = Path(tempfile.mkdtemp())
         pf = td / "p.json"
-        body = {
-            "mode": "deny_all",
-            "policy_version": "t",
-            "file_count_ceiling": 50,
-            "byte_ceiling": 1000,
-            "require_remote_anchor": False,
-        }
-        # digest
-        import copy
-        dig = hashlib.sha256(
-            json.dumps(
-                {k: v for k, v in body.items()}, sort_keys=True, separators=(",", ":")
-            ).encode()
-        ).hexdigest()
-        # load_policy computes digest of body without policy_digest key
-        pf.write_text(json.dumps(body))
+        write_test_policy_file(
+            pf,
+            overrides={
+                "mode": "deny_all",
+                "policy_version": "t",
+                "file_count_ceiling": 50,
+                "byte_ceiling": 1000,
+                "require_remote_anchor": False,
+            },
+            install_trust=True,
+        )
         os.environ["OMNIS_WING_POLICY_PATH"] = str(pf)
         try:
             r = run_preflight()
             self.assertFalse(r.ok)
             self.assertTrue(any("deny_all" in e for e in r.errors))
         finally:
-            os.environ.pop("OMNIS_WING_POLICY_PATH", None)
+            bootstrap_wing_test_env(force=True)
             shutil.rmtree(td, ignore_errors=True)
 
 
 class ZeroToleranceSmoke(unittest.TestCase):
     def setUp(self):
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
-        os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
+        bootstrap_wing_test_env()
 
     def test_zt_chat_secret_refuse_signed_absent(self):
         client = FakeClient()
@@ -346,15 +349,11 @@ class ZeroToleranceSmoke(unittest.TestCase):
         client.base_url = "https://api.moonshot.cn/v1"
         agent = MiniAgent(client)
         agent.base_url = client.base_url
-        os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
-        try:
-            with self.assertRaises(WingRefusal):
-                interruptible_api_call(
-                    agent, _kw("def foo():\n  # chamber project\n  pass")
-                )
-            self.assertEqual(client.create_calls, 0)
-        finally:
-            os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+        with self.assertRaises(WingRefusal):
+            interruptible_api_call(
+                agent, _kw("def foo():\n  # chamber project\n  pass")
+            )
+        self.assertEqual(client.create_calls, 0)
 
 
 if __name__ == "__main__":

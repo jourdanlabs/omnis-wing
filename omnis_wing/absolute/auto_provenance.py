@@ -28,9 +28,7 @@ def workspace_root() -> Path:
 
 
 def classify_workspace(root: Path) -> str:
-    force = os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION")
-    if force in ("generic", "project", "protected"):
-        return force
+    """Path-name heuristic only — never an ambient env override."""
     name = root.name.lower()
     parts = {p.lower() for p in root.parts}
     if any(m in name or m in parts for m in _DEFAULT_PROTECTED_NAME_MARKERS):

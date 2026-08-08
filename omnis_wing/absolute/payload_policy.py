@@ -7,7 +7,6 @@ Never requires a sensitive-mode switch. Never puts raw secrets into receipts.
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional, Sequence, Tuple
@@ -79,8 +78,11 @@ def iter_string_fields(obj: Any, prefix: str = "") -> Iterable[Tuple[str, str]]:
 
 
 def classify_bytes(data: bytes, field_path: str = "") -> FieldFragment:
-    """Classify one fragment from content signals (M1 taint-aligned)."""
-    # Prefer shared taint classifier
+    """Classify one fragment from content signals (M1 taint-aligned).
+
+    No ambient environment override. Shared taint classifier is authority.
+    """
+    # Prefer shared taint classifier — sole production classification path
     try:
         rec = classify_content_bytes(data, path_hint=field_path or "payload")
         return FieldFragment(
@@ -94,12 +96,9 @@ def classify_bytes(data: bytes, field_path: str = "") -> FieldFragment:
         pass
     d = _digest(data)
     if not data or not data.strip():
-        empty_force = (os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION") or "").strip().lower()
-        if empty_force in ("generic", "project", "protected", "unknown"):
-            return FieldFragment(field_path or "payload", d, empty_force, empty_force!="generic", False)
         return FieldFragment(field_path or "payload", d, "generic", False, False)
 
-    # Credentials first — never overridden by force hook
+    # Credentials first
     if PRIVATE_KEY_RE.search(data):
         return FieldFragment(field_path or "payload", d, "credential", True, False)
     for m in PLANTED_SECRET_MARKERS:
@@ -107,17 +106,6 @@ def classify_bytes(data: bytes, field_path: str = "") -> FieldFragment:
             return FieldFragment(field_path or "payload", d, "credential", True, False)
     if TOKEN_RE.search(data):
         return FieldFragment(field_path or "payload", d, "credential", True, False)
-
-    # Force hook for cold tests only (non-secret content)
-    force = (os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION") or "").strip().lower()
-    if force in ("generic", "project", "protected", "unknown", "credential"):
-        return FieldFragment(
-            field_path=field_path or "payload",
-            digest=d,
-            classification=force,
-            protected_root=force in ("project", "protected", "unknown", "credential"),
-            crown_jewel=force == "protected" and b"CROWN" in data.upper(),
-        )
 
     if _PROTECTED_MARKER_RE.search(data):
         return FieldFragment(field_path or "payload", d, "protected", True, True)

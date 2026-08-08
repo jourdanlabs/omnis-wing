@@ -194,8 +194,7 @@ def interruptible_api_call(agent, api_kwargs: dict):
         try:
             from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
             from omnis_wing.absolute.runtime_context import set_wing_agent, reset_wing_agent
-            from omnis_wing.absolute.universal_egress import governed_callable_transmit
-            from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+            from omnis_wing.absolute.transport_broker import get_broker
 
             _wing_tok = set_wing_agent(agent)
             ensure_agent_wing_context(agent, api_kwargs)
@@ -215,7 +214,7 @@ def interruptible_api_call(agent, api_kwargs: dict):
                             on_first_delta=getattr(agent, "_codex_on_first_delta", None),
                         )
 
-                    result["response"] = governed_callable_transmit(
+                    result["response"] = get_broker().transmit_callable(
                         agent=agent,
                         body=dict(api_kwargs),
                         transmit_fn=_codex_tx,
@@ -230,7 +229,7 @@ def interruptible_api_call(agent, api_kwargs: dict):
                         finally:
                             agent._wing_in_governed_transmit = False
 
-                    result["response"] = governed_callable_transmit(
+                    result["response"] = get_broker().transmit_callable(
                         agent=agent,
                         body=dict(api_kwargs),
                         transmit_fn=_ant_tx,
@@ -262,7 +261,7 @@ def interruptible_api_call(agent, api_kwargs: dict):
                             raise
                         return normalize_converse_response(raw_response)
 
-                    result["response"] = governed_callable_transmit(
+                    result["response"] = get_broker().transmit_callable(
                         agent=agent,
                         body=dict(api_kwargs),
                         transmit_fn=_bed_tx,
@@ -276,7 +275,7 @@ def interruptible_api_call(agent, api_kwargs: dict):
                             api_kwargs=api_kwargs,
                         )
                     )
-                    result["response"] = governed_chat_completions_create(
+                    result["response"] = get_broker().transmit_chat_completions(
                         request_client,
                         api_kwargs,
                         ensure_agent_wing_context(agent, api_kwargs),
@@ -1546,10 +1545,10 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                 _summary_result = _tsum.normalize_response(summary_response, strip_tool_prefix=agent._is_anthropic_oauth)
                 final_response = (_summary_result.content or "").strip()
             else:
-                from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+                from omnis_wing.absolute.transport_broker import get_broker
                 from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
                 _sc = agent._ensure_primary_openai_client(reason="iteration_limit_summary")
-                summary_response = governed_chat_completions_create(
+                summary_response = get_broker().transmit_chat_completions(
                     _sc, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs)
                 )
                 _summary_result = agent._get_transport().normalize_response(summary_response)
@@ -1594,10 +1593,10 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                 if summary_extra_body:
                     summary_kwargs["extra_body"] = summary_extra_body
 
-                from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+                from omnis_wing.absolute.transport_broker import get_broker
                 from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
                 _sc2 = agent._ensure_primary_openai_client(reason="iteration_limit_summary_retry")
-                summary_response = governed_chat_completions_create(
+                summary_response = get_broker().transmit_chat_completions(
                     _sc2, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs)
                 )
                 _retry_result = agent._get_transport().normalize_response(summary_response)
@@ -1928,10 +1927,10 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
         # ``request_client_holder["diag"]`` for closure access.
         _diag = agent._stream_diag_init()
         request_client_holder["diag"] = _diag
-        from omnis_wing.absolute.universal_egress import governed_streaming_create
+        from omnis_wing.absolute.transport_broker import get_broker
         from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
         ensure_agent_wing_context(agent, stream_kwargs)
-        stream = governed_streaming_create(
+        stream = get_broker().transmit_streaming(
             agent=agent,
             client=request_client,
             api_kwargs=stream_kwargs,

@@ -32,10 +32,22 @@ def run_preflight(agent=None) -> PreflightResult:
     policy_valid = True
     policy_mode = "enforce"
     require_anchor = False
+    policy_digest_display: Optional[str] = None
+    # P0-1: ambient force-classification must never affect production classification.
+    # Presence is ignored for classify paths (removed) and refused at preflight in
+    # enforce/local_only so operators cannot rely on it as a silent bypass switch.
+    if (os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION") or "").strip():
+        errors.append("force_classification_env_forbidden")
+
     try:
         pol = load_policy()
         policy_mode = pol.mode
         require_anchor = pol.require_remote_anchor
+        if not pol.signature_valid:
+            policy_valid = False
+            errors.append("policy:signature_invalid")
+        else:
+            policy_digest_display = pol.policy_digest
         if pol.mode == "deny_all":
             errors.append("policy_deny_all")
     except PolicyError as exc:
@@ -111,8 +123,12 @@ def run_preflight(agent=None) -> PreflightResult:
     )
     ok = len(errors) == 0 and g["color"] == "GREEN"
     if mode == "test":
-        # dogfood: allow green path with test signer if policy ok
+        # dogfood: allow green path with test signer if policy ok —
+        # still hard-fail force-classification env (must never be a silent switch).
         ok = policy_valid and not any(
-            x.startswith("route_") or x.startswith("policy") for x in errors
+            x.startswith("route_")
+            or x.startswith("policy")
+            or x.startswith("force_classification")
+            for x in errors
         )
     return PreflightResult(ok=ok, errors=errors, glass=g)

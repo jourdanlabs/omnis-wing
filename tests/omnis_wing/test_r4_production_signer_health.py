@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 _tmp_home = tempfile.mkdtemp(prefix="omnis-wing-r4-home-")
 os.environ["HERMES_HOME"] = _tmp_home
+os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 for _name in ("requests", "yaml"):
     if _name not in sys.modules:
         _m = types.ModuleType(_name)
@@ -27,14 +28,19 @@ for _name in ("requests", "yaml"):
             _m.safe_load = lambda stream: {}  # type: ignore
         sys.modules[_name] = _m
 
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
+
+bootstrap_wing_test_env()
+os.environ.setdefault("OMNIS_WING_SIGNER_MODE", "test")
+
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.envelope import SourceProvenance  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
     EvidenceSession,
     WingEgressContext,
     WingRefusal,
-    governed_chat_completions_create,
 )
+from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.absolute.production_signer import (  # noqa: E402
     CAPTAIN_R4_TAG,
     DisposableP256Backend,
@@ -198,7 +204,7 @@ class R4ProductionSignerHealthTests(unittest.TestCase):
         adapter = ProductionSignerAdapter(backend=be)
         ledger = EvidenceLedger(self.td / "ledger.jsonl")
         ev = EvidenceSession(signer=adapter, ledger=ledger)
-        governed_chat_completions_create(
+        get_broker().transmit_chat_completions(
             FakeClient(), _api_kwargs(), WingEgressContext(sources=(_src(),), evidence=ev)
         )
         # mutate ledger
@@ -308,7 +314,7 @@ class R4ProductionSignerHealthTests(unittest.TestCase):
         adapter = ProductionSignerAdapter(backend=be)
         ledger = EvidenceLedger(self.td / "u.jsonl")
         ev = EvidenceSession(signer=adapter, ledger=ledger)
-        governed_chat_completions_create(
+        get_broker().transmit_chat_completions(
             FakeClient(), _api_kwargs(), WingEgressContext(sources=(_src(),), evidence=ev)
         )
         entries = ledger.load_entries()
