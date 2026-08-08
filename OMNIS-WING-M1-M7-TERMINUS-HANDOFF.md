@@ -21,7 +21,7 @@
 | Branch | `omnis-wing/v0-admission` |
 | Starting impl (R5–R7) | `b5a668f52c3c6462204560d2262f937768cc3b12` |
 | Starting head | `8b65e15eafa9ac1152c0eb450a293a071e1d5479` |
-| **This implementation** | *(filled at commit)* |
+| **This implementation** | bda40227373eec80020f48ffaf4aba0ab8e22b94 |
 | Live Hermes | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` **untouched** |
 
 ## Cold
