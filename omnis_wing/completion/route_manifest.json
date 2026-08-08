@@ -130,6 +130,19 @@
       "disable_reason": "Auxiliary multi-client fanout not safe as silent bypass; use primary governed path or explicit future route"
     },
     {
+      "route_id": "wing.image.governed",
+      "source": "omnis_wing/absolute/image_join.py:governed_image_transmit",
+      "modality": "image",
+      "client": "openai_compatible_image",
+      "broker_join": "omnis_wing.absolute.transport_broker.TransportBroker.transmit_image",
+      "destination": "client.base_url+HOSTNAME_POLICY",
+      "provenance": "body_taint",
+      "receipt": "EvidenceLedger",
+      "test": "tests.omnis_wing.test_full_cadmus_zt_matrix",
+      "state": "GOVERNED",
+      "notes": "Matrix GOVERNED image door; product tools.vision_tools remains DISABLED until it calls this join"
+    },
+    {
       "route_id": "tools.vision_tools",
       "source": "tools/vision_tools.py",
       "modality": "vision",
@@ -140,7 +153,7 @@
       "receipt": "n/a",
       "test": "tests.omnis_wing.test_completion_disabled",
       "state": "DISABLED",
-      "disable_reason": "Vision provider side-door disabled until dedicated governed join"
+      "disable_reason": "Vision provider side-door disabled until dedicated governed join via TransportBroker.transmit_image"
     },
     {
       "route_id": "tools.tts_tool",
@@ -282,8 +295,8 @@
       "provenance": "n/a",
       "receipt": "n/a",
       "test": "manifest_named",
-      "state": "DISABLED",
-      "disable_reason": "Not model-bound user\u2192provider AI egress; messaging platforms remain out of AI egress claim and are not silent AI bypasses"
+      "state": "OUTSIDE_BOUNDARY",
+      "outside_reason": "Not model-bound user→provider AI egress; messaging platforms remain outside WING AI transmission claim and are not silent AI bypasses"
     },
     {
       "route_id": "health.provider_probe_no_user_payload",
@@ -300,7 +313,8 @@
     }
   ],
   "summary": {
-    "GOVERNED": 10,
-    "DISABLED": 13
+    "GOVERNED": 11,
+    "DISABLED": 12,
+    "OUTSIDE_BOUNDARY": 1
   }
 }

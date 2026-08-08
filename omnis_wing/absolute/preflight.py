@@ -57,15 +57,19 @@ def run_preflight(agent=None) -> PreflightResult:
     # manifest complete
     try:
         man = load_manifest()
+        allowed_states = ("GOVERNED", "DISABLED", "OUTSIDE_BOUNDARY")
         for r in man["routes"]:
-            if r["state"] not in ("GOVERNED", "DISABLED"):
-                errors.append(f"route_bad_state:{r['route_id']}")
-            if r["state"] not in ("GOVERNED", "DISABLED", "OUTSIDE_BOUNDARY"):
-                pass
-        # unresolved forbidden
+            st = r.get("state")
+            if st not in allowed_states:
+                errors.append(f"route_bad_state:{r.get('route_id')}:{st}")
+            # OUTSIDE_BOUNDARY requires a concrete non-AI reason
+            if st == "OUTSIDE_BOUNDARY" and not (
+                r.get("outside_reason") or r.get("disable_reason") or r.get("notes")
+            ):
+                errors.append(f"outside_boundary_missing_reason:{r.get('route_id')}")
         if man.get("forbidden_states"):
             for r in man["routes"]:
-                if r["state"] in man["forbidden_states"]:
+                if r.get("state") in man["forbidden_states"]:
                     errors.append(f"forbidden_state:{r['route_id']}")
     except Exception as exc:
         errors.append(f"manifest:{type(exc).__name__}")

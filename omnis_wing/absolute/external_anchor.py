@@ -86,3 +86,64 @@ def resolve_anchor_status(ledger_head: str) -> AnchorStatus:
             head_digest=ledger_head,
         )
     return LocalFileAnchor(Path(cfg)).status(ledger_head)
+
+
+@dataclass
+class PendingAnchorQueue:
+    """Durable local pending queue for external anchor publish/retry.
+
+    Honesty: a non-empty queue is PENDING, never VERIFIED remote durability.
+    """
+
+    path: Path
+
+    def _load(self) -> list:
+        if not self.path.is_file():
+            return []
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            return list(data.get("pending") or [])
+        except Exception:
+            return []
+
+    def _save(self, pending: list) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"pending": pending, "kind": "external_anchor_pending_queue_v1"}
+        self.path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+    def enqueue(self, ledger_head: str) -> AnchorStatus:
+        pending = self._load()
+        if ledger_head not in pending:
+            pending.append(ledger_head)
+        self._save(pending)
+        return AnchorStatus(
+            "PENDING",
+            "enqueued_for_external_witness_not_remote_verified",
+            head_digest=ledger_head,
+        )
+
+    def status(self, ledger_head: str) -> AnchorStatus:
+        pending = self._load()
+        if ledger_head in pending:
+            return AnchorStatus(
+                "PENDING",
+                "head_in_pending_queue_not_remote_verified",
+                head_digest=ledger_head,
+            )
+        # fall through to configured local fixture if any
+        return resolve_anchor_status(ledger_head)
+
+    def mark_published_local_only(self, ledger_head: str, anchor_path: Path) -> AnchorStatus:
+        """Test helper: publish via LocalFileAnchor and drop from pending."""
+        st = LocalFileAnchor(anchor_path).publish(ledger_head)
+        pending = [h for h in self._load() if h != ledger_head]
+        self._save(pending)
+        # still local fixture — never claim remote
+        if st.state == "VERIFIED":
+            return AnchorStatus(
+                "VERIFIED",
+                "local_fixture_only_not_remote",
+                head_digest=st.head_digest,
+                anchor_digest=st.anchor_digest,
+            )
+        return st

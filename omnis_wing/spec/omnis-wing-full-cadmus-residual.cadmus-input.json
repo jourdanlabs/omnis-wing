@@ -1,0 +1,39 @@
+{
+  "schema": "cadmus.input.v0",
+  "id": "omnis-wing-full-cadmus-residual-post-p0",
+  "title": "OMNIS WING FULL CADMUS residual after P0 CLEAR",
+  "authority": [
+    "BULMA-TERMINUS-ABSOLUTE-1.0.md",
+    "BULMA-VIDEL-WING-TERMINUS-ABSOLUTE-FULL-CADMUS-2026-08-07.md",
+    "BULMA-GATE-WING-P0-dfef719c2d-2026-08-08.md"
+  ],
+  "base_pin": "dfef719c2d0bcbb62dc13c9b2e0273ba27e3eb4b",
+  "intent": "Close residual zero-tolerance matrix items after P0-1/2/3 CLEAR without claiming TERMINUS ABSOLUTE COMPLETE or live cutover.",
+  "done_criteria": [
+    "Redirect-enabled client refuses with provider_calls=0",
+    "GOVERNED image modality hostile corpus parity with chat",
+    "Scanner fault refuses provider_calls=0",
+    "Secret-free hygiene rejects cleartext markers and bare low-entropy marker digests",
+    "Benign corpus refusal budget frozen and measured green",
+    "Scanner latency P50/P95/P99 budgets frozen and measured green",
+    "External anchor pending queue is PENDING not false VERIFIED",
+    "OUTSIDE_BOUNDARY for non-AI messaging with reason",
+    "Transport sweep runnable; broker still sole image join",
+    "Cold full omnis_wing suite green",
+    "Status READY_FOR_GATE only — never self-CLEAR"
+  ],
+  "non_goals": [
+    "Live Hermes replace",
+    "Keychain enroll/rotate/export",
+    "Remote production anchor durability claim",
+    "Secure Enclave attestation",
+    "Package/notarize/publish",
+    "TERMINUS ABSOLUTE COMPLETE claim from builder"
+  ],
+  "constraints": [
+    "Work only ~/projects/omnis-wing",
+    "No live provider incidental tests",
+    "No ambient FORCE_CLASSIFICATION",
+    "P0 controls retained"
+  ]
+}

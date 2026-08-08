@@ -20,4 +20,6 @@ exec "$PY" -m unittest \
   tests.omnis_wing.test_production_cutover \
   tests.omnis_wing.test_r5_r6_r7_convergence \
   tests.omnis_wing.test_m1_m7_terminus \
+  tests.omnis_wing.test_p0_m1_m7_hold_repair \
+  tests.omnis_wing.test_full_cadmus_zt_matrix \
   -v

@@ -388,6 +388,15 @@ def build_envelope_for_chat(
     if err is not None:
         return None, _refusal_receipt(decision="REFUSE_UNSUPPORTED", reason=err)
 
+    from omnis_wing.absolute.redirect_guard import assert_no_redirect_transport
+
+    ok_redir, redir_reason = assert_no_redirect_transport(client)
+    if not ok_redir:
+        return None, _refusal_receipt(
+            decision="REFUSE_DESTINATION",
+            reason=redir_reason or "redirect_enabled",
+        )
+
     dest, derr = derive_destination_from_client(client)
     if derr is not None or dest is None:
         return None, _refusal_receipt(

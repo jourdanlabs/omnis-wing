@@ -22,6 +22,7 @@ from omnis_wing.absolute.universal_egress import (
     governed_streaming_create,
 )
 from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+from omnis_wing.absolute.image_join import governed_image_transmit
 
 _lock = threading.RLock()
 _REGISTERED_TRANSPORTS: Set[str] = set()
@@ -84,6 +85,27 @@ class TransportBroker:
             _REGISTERED_TRANSPORTS.add(route_id)
         return governed_streaming_create(
             agent=agent, client=client, api_kwargs=api_kwargs, route_id=route_id
+        )
+
+    def transmit_image(
+        self,
+        *,
+        agent: Any,
+        body: dict,
+        transmit_fn: Callable[[dict], Any],
+        client: Any = None,
+        route_id: str = "image.governed",
+        wing_ctx: Any = None,
+    ) -> Any:
+        with _lock:
+            _REGISTERED_TRANSPORTS.add(route_id)
+        return governed_image_transmit(
+            agent=agent,
+            body=body,
+            transmit_fn=transmit_fn,
+            client=client,
+            route_id=route_id,
+            wing_ctx=wing_ctx,
         )
 
 

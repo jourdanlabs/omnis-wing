@@ -20,6 +20,7 @@ BANNED_GOVERNED_NAMES = frozenset(
         "governed_chat_completions_create",
         "governed_callable_transmit",
         "governed_streaming_create",
+        "governed_image_transmit",
     }
 )
 
@@ -39,6 +40,7 @@ ALLOWED_GOVERNED_MODULES = frozenset(
         "omnis_wing.absolute.transport_broker",
         "omnis_wing.absolute.hermes_chat_join",
         "omnis_wing.absolute.universal_egress",
+        "omnis_wing.absolute.image_join",
         "omnis_wing.absolute.broker_guard",
     }
 )
@@ -48,6 +50,7 @@ ALLOWED_PATH_PREFIXES = (
     "omnis_wing/absolute/transport_broker.py",
     "omnis_wing/absolute/hermes_chat_join.py",
     "omnis_wing/absolute/universal_egress.py",
+    "omnis_wing/absolute/image_join.py",
     "omnis_wing/absolute/broker_guard.py",
     "tests/",  # tests may instrument / assert
     "omnis_wing/spec/",
@@ -71,6 +74,7 @@ _TRANSMIT_METHODS = frozenset(
         "transmit_chat_completions",
         "transmit_callable",
         "transmit_streaming",
+        "transmit_image",
     }
 )
 
@@ -78,11 +82,13 @@ _BANNED_MODULE_FRAGMENTS = (
     "hermes_chat_join",
     "universal_egress",
     "broker_guard",
+    "image_join",
 )
 
 _NAME_RE = re.compile(
     r"\b(governed_chat_completions_create|governed_callable_transmit|"
-    r"governed_streaming_create|broker_dispatch_scope|require_broker_dispatch)\b"
+    r"governed_streaming_create|governed_image_transmit|"
+    r"broker_dispatch_scope|require_broker_dispatch)\b"
 )
 
 _DYNAMIC_IMPORT_FUNCS = frozenset(

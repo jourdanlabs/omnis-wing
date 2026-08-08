@@ -220,6 +220,20 @@ def governed_callable_transmit(
             )
         ) from exc
 
+    from omnis_wing.absolute.redirect_guard import assert_no_redirect_transport
+
+    ok_redir, redir_reason = assert_no_redirect_transport(client)
+    if not ok_redir:
+        early = _refusal_receipt(
+            decision="REFUSE_DESTINATION",
+            reason=redir_reason or "redirect_enabled",
+        )
+        try:
+            signed = _sign_and_ledger(early, evidence)
+        except Exception:
+            signed = None
+        raise WingRefusal(early, signed=signed)
+
     payload, err = canonical_body_bytes(body)
     if err:
         early = _refusal_receipt(decision="REFUSE_UNSUPPORTED", reason=err)
