@@ -2,8 +2,12 @@
 
 No other module may own an outbound provider socket/client call for AI payload
 routes. All GOVERNED routes enter here. Governed implementation functions are
-not public agent API — they are reachable only while this broker holds the
-dispatch scope (runtime gate) and agent trees must not import them (source guard).
+not public agent API — they are reachable only when a real
+``TransportBroker.transmit_*`` frame is on the stack (runtime gate) and agent
+trees must not import them (source guard).
+
+There is no public enterable scope token. Final provider-dispatch ownership is
+structurally confined to this class's transmit methods.
 """
 
 from __future__ import annotations
@@ -12,7 +16,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Set
 
-from omnis_wing.absolute.broker_guard import BrokerViolation, broker_dispatch_scope
+from omnis_wing.absolute.broker_guard import BrokerViolation
 from omnis_wing.absolute.universal_egress import (
     governed_callable_transmit,
     governed_streaming_create,
@@ -41,8 +45,9 @@ class TransportBroker:
     def transmit_chat_completions(self, client: Any, api_kwargs: dict, wing_ctx: Any) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add("chat_completions")
-        with broker_dispatch_scope():
-            return governed_chat_completions_create(client, api_kwargs, wing_ctx)
+        # Stack frame of this method is the sole runtime authority for
+        # require_broker_dispatch inside the governed implementation.
+        return governed_chat_completions_create(client, api_kwargs, wing_ctx)
 
     def transmit_callable(
         self,
@@ -57,16 +62,15 @@ class TransportBroker:
     ) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
-        with broker_dispatch_scope():
-            return governed_callable_transmit(
-                agent=agent,
-                body=body,
-                transmit_fn=transmit_fn,
-                client=client,
-                path_class=path_class,
-                route_id=route_id,
-                wing_ctx=wing_ctx,
-            )
+        return governed_callable_transmit(
+            agent=agent,
+            body=body,
+            transmit_fn=transmit_fn,
+            client=client,
+            path_class=path_class,
+            route_id=route_id,
+            wing_ctx=wing_ctx,
+        )
 
     def transmit_streaming(
         self,
@@ -78,10 +82,9 @@ class TransportBroker:
     ) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
-        with broker_dispatch_scope():
-            return governed_streaming_create(
-                agent=agent, client=client, api_kwargs=api_kwargs, route_id=route_id
-            )
+        return governed_streaming_create(
+            agent=agent, client=client, api_kwargs=api_kwargs, route_id=route_id
+        )
 
 
 _BROKER: Optional[TransportBroker] = None

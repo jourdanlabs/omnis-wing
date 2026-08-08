@@ -45,6 +45,7 @@ from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.broker_guard import (  # noqa: E402
     BrokerViolation,
     assert_no_agent_governed_bypass,
+    broker_dispatch_scope,
     require_broker_dispatch,
 )
 from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
@@ -265,6 +266,74 @@ class P0_2_BrokerSoleJoinTests(unittest.TestCase):
                 bj,
                 msg=f"{r['route_id']} broker_join={bj}",
             )
+
+    def test_direct_scope_bypass_provider_calls_zero(self):
+        """Bulma re-gate can-fail: mint public scope outside broker → must not reach provider.
+
+        Cold probe: import broker_dispatch_scope, enter it, call
+        governed_chat_completions_create with fake client. Provider calls must
+        stay 0 (DIRECT_SCOPE_BYPASS_PROVIDER_CALLS must not be 1).
+        """
+        from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+        from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
+
+        client = FakeClient()
+        agent = MiniAgent(client)
+        ctx = ensure_agent_wing_context(agent, _kw("scope forge probe"))
+        # Public enterable scope must NOT authorize dispatch.
+        with broker_dispatch_scope():
+            with self.assertRaises(BrokerViolation) as cm:
+                governed_chat_completions_create(client, _kw("scope forge probe"), ctx)
+        self.assertIn("direct_governed_call_forbidden", str(cm.exception))
+        self.assertEqual(
+            client.create_calls,
+            0,
+            msg=f"DIRECT_SCOPE_BYPASS_PROVIDER_CALLS={client.create_calls}",
+        )
+        # Naked require_broker_dispatch under forged scope also fails closed.
+        with broker_dispatch_scope():
+            with self.assertRaises(BrokerViolation):
+                require_broker_dispatch("forged_scope_probe")
+
+    def test_dynamic_plant_guard_rejects_late_import(self):
+        """Bulma re-gate can-fail: planted dynamic/late-import bypass must be RED.
+
+        Temporary agent/planted_dynamic_bypass.py assembles module + helper
+        names, imports broker_dispatch_scope, wraps governed call. Source guard
+        must raise BrokerViolation (DYNAMIC_PLANT_GUARD must not be PASSED_UNDETECTED).
+        """
+        plant = ROOT / "agent" / "planted_dynamic_bypass.py"
+        self.assertFalse(plant.exists(), msg="plant must not pre-exist in product tree")
+        plant_src = '''\
+"""Planted dynamic/late-import bypass — must be rejected by source guard."""
+import importlib
+
+_mod = "omnis_wing.absolute." + "hermes_chat_join"
+_helper = "governed_" + "chat_completions_create"
+_scope_mod = "omnis_wing.absolute." + "broker_guard"
+_scope_name = "broker_dispatch_" + "scope"
+
+def _planted():
+    m = importlib.import_module(_mod)
+    fn = getattr(m, _helper)
+    bg = importlib.import_module(_scope_mod)
+    scope = getattr(bg, _scope_name)
+    with scope():
+        return fn
+'''
+        try:
+            plant.write_text(plant_src, encoding="utf-8")
+            with self.assertRaises(BrokerViolation) as cm:
+                assert_no_agent_governed_bypass(ROOT)
+            msg = str(cm.exception)
+            self.assertIn("agent_governed_bypass", msg)
+            # Must not pass undetected
+            self.assertNotEqual(msg, "PASSED_UNDETECTED")
+        finally:
+            if plant.exists():
+                plant.unlink()
+        # Clean tree after plant removal must still pass
+        assert_no_agent_governed_bypass(ROOT)
 
 
 class P0_3_SignedPolicyTests(unittest.TestCase):
