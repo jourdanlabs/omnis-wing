@@ -212,14 +212,14 @@ class R4ProductionSignerHealthTests(unittest.TestCase):
         report = build_health_report(root=ROOT, ledger=ledger, signer=adapter)
         self.assertEqual(report["verifier"], "INVALID")
         self.assertFalse(report["ledger"]["chain_valid"])
-        self.assertEqual(report["remote_anchor"]["state"], "NOT_CONFIGURED")
+        self.assertIn(report["remote_anchor"]["state"], ("NOT_CONFIGURED", "REMOTE_ANCHOR_NOT_CONFIGURED"))
 
     def test_05_health_anchor_not_configured_never_green_remote(self):
         be = DisposableTestBackend(tag=TEST_TAG, enrolled=True)
         adapter = ProductionSignerAdapter(backend=be)
         ledger = EvidenceLedger(self.td / "empty.jsonl")
         report = build_health_report(root=ROOT, ledger=ledger, signer=adapter)
-        self.assertEqual(report["remote_anchor"]["state"], "NOT_CONFIGURED")
+        self.assertIn(report["remote_anchor"]["state"], ("NOT_CONFIGURED", "REMOTE_ANCHOR_NOT_CONFIGURED"))
         self.assertNotEqual(report["remote_anchor"]["state"], "GREEN")
         blob = json.dumps(report)
         self.assertNotIn("remote durability achieved", blob.lower())
@@ -292,7 +292,7 @@ class R4ProductionSignerHealthTests(unittest.TestCase):
         report = build_health_report(root=ROOT, ledger=ledger, signer=adapter)
         self.assertTrue(report["ledger"]["chain_valid"])
         self.assertIn(report["verifier"], ("OK", "DEGRADED_OUTCOME_UNKNOWN"))
-        self.assertEqual(report["remote_anchor"]["state"], "NOT_CONFIGURED")
+        self.assertIn(report["remote_anchor"]["state"], ("NOT_CONFIGURED", "REMOTE_ANCHOR_NOT_CONFIGURED"))
         # mutation → INVALID
         lines = ledger.path.read_text().splitlines()
         d = json.loads(lines[-1])
@@ -350,7 +350,7 @@ class R4ProductionSignerHealthTests(unittest.TestCase):
         self.assertTrue(ok, reason)
         report = build_health_report(root=ROOT, ledger=ledger, signer=adapter)
         self.assertTrue(report["ledger"]["chain_valid"])
-        self.assertEqual(report["remote_anchor"]["state"], "NOT_CONFIGURED")
+        self.assertIn(report["remote_anchor"]["state"], ("NOT_CONFIGURED", "REMOTE_ANCHOR_NOT_CONFIGURED"))
 
 
 if __name__ == "__main__":

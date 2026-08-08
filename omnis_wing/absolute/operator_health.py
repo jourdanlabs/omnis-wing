@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from omnis_wing.absolute.production_signer import ProductionSignerAdapter
+from omnis_wing.absolute.external_anchor import resolve_anchor_status
+from omnis_wing.absolute.glass import glass_state
 from omnis_wing.absolute.receipt_spine import (
     EvidenceLedger,
     GENESIS_PREV,
@@ -131,12 +133,38 @@ def build_health_report(
         "claims_whole_tree_ai_egress": bool(cov.get("claims_whole_tree_ai_egress")),
         "remote_anchor": remote_anchor,
         "verifier": verifier,
+
         "notes": [
             "Health is observational and cannot clear a failed chain.",
             "storage_state UNVERIFIED_AT_READ must not be read as hardware_backed=true.",
             "Selected ordinary non-stream chat.completions path only.",
         ],
     }
+    
+    try:
+        from omnis_wing.absolute.signed_policy import load_policy
+        _pol = load_policy()
+        _pmode, _pvalid, _req_a, _pdig = _pol.mode, True, _pol.require_remote_anchor, _pol.policy_digest
+    except Exception:
+        _pmode, _pvalid, _req_a, _pdig = "unknown", False, False, None
+    _head = ledger.head_digest() if entries else GENESIS_PREV
+    _anchor = resolve_anchor_status(_head)
+    report["remote_anchor"] = _anchor.to_dict()
+    report["policy"] = {
+        "mode": _pmode,
+        "valid": _pvalid,
+        "digest": _pdig,
+        "require_remote_anchor": _req_a,
+    }
+    report["glass"] = glass_state(
+        signer_ready=bool(enrollment.get("ready")),
+        chain_valid=chain_valid,
+        policy_valid=_pvalid,
+        policy_mode=_pmode if _pvalid else "invalid",
+        anchor_state=_anchor.state,
+        require_anchor=_req_a,
+        ungoverned_route=False,
+    )
     return report
 
 

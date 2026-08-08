@@ -14,6 +14,7 @@ from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 from omnis_wing.absolute.envelope import SourceProvenance
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS, PRIVATE_KEY_RE, TOKEN_RE
+from omnis_wing.absolute.source_taint import classify_content_bytes, merge_taint, taint_concat, taint_summarize
 
 # Content signals — NOT workspace directory names as sole authority
 _PROJECT_PATH_RE = re.compile(
@@ -78,7 +79,19 @@ def iter_string_fields(obj: Any, prefix: str = "") -> Iterable[Tuple[str, str]]:
 
 
 def classify_bytes(data: bytes, field_path: str = "") -> FieldFragment:
-    """Classify one fragment from content signals."""
+    """Classify one fragment from content signals (M1 taint-aligned)."""
+    # Prefer shared taint classifier
+    try:
+        rec = classify_content_bytes(data, path_hint=field_path or "payload")
+        return FieldFragment(
+            field_path=field_path or "payload",
+            digest=rec.digest,
+            classification=rec.classification,
+            protected_root=rec.protected_root,
+            crown_jewel=rec.crown_jewel,
+        )
+    except Exception:
+        pass
     d = _digest(data)
     if not data or not data.strip():
         empty_force = (os.environ.get("OMNIS_WING_FORCE_CLASSIFICATION") or "").strip().lower()

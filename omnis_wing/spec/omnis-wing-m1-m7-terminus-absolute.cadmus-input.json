@@ -1,0 +1,23 @@
+{
+  "authority": "BULMA-TERMINUS-ABSOLUTE-1.0",
+  "contract": "BULMA-VIDEL-WING-TERMINUS-ABSOLUTE-FULL-CADMUS-2026-08-07",
+  "milestones": [
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7"
+  ],
+  "non_claims": [
+    "not full workstation TERMINUS",
+    "not live Hermes cutover complete until M7 sealed+Bulma CLEAR",
+    "not safe raw protected to CN remote",
+    "not hardware attested without attestation",
+    "not anchored without verified external anchor"
+  ],
+  "product": "OMNIS WING",
+  "schema": "cadmus-input.v1",
+  "starting_impl": "b5a668f52c3c6462204560d2262f937768cc3b12"
+}

@@ -423,7 +423,7 @@ class R7CoverageAdversarialTests(unittest.TestCase):
         self.assertIn("ledger", report)
         self.assertIn("coverage_boundary", report)
         self.assertIn("remote_anchor", report)
-        self.assertEqual(report["remote_anchor"]["state"], "NOT_CONFIGURED")
+        self.assertIn(report["remote_anchor"]["state"], ("NOT_CONFIGURED", "REMOTE_ANCHOR_NOT_CONFIGURED"))
         self.assertFalse(report.get("claims_whole_tree_ai_egress", True))
         # routes summary via operator coverage
         man = load_manifest()

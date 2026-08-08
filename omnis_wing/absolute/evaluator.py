@@ -19,6 +19,7 @@ Decision = Literal[
     "REFUSE_POLICY_INVALID",
     "REFUSE_CROWN_JEWEL",
     "REFUSE_UNSUPPORTED",
+    "REFUSE_REPO_BREADTH",
 ]
 
 Phase = Literal[
@@ -117,6 +118,21 @@ def evaluate_decision(
 
     if not envelope.policy_version or not envelope.coverage_class:
         return auth("REFUSE_POLICY_INVALID", "missing policy_version or coverage_class")
+
+    # M6 signed policy mode
+    try:
+        from omnis_wing.absolute.signed_policy import load_policy, PolicyError
+        _pol = load_policy()
+        if _pol.mode == "deny_all":
+            return auth("REFUSE_POLICY_INVALID", "policy_deny_all")
+        if _pol.mode == "local_only":
+            res = envelope.intended_destination.residency.strip().upper()
+            if res not in ("LOCAL",):
+                return auth("REFUSE_RESIDENCY", "policy_local_only")
+    except Exception as _pol_exc:
+        from omnis_wing.absolute.signed_policy import PolicyError
+        if isinstance(_pol_exc, PolicyError) or "policy" in type(_pol_exc).__name__.lower():
+            return auth("REFUSE_POLICY_INVALID", f"policy_load:{_pol_exc}")
     if dest.scheme not in ("https", "http"):
         return auth("REFUSE_DESTINATION", "invalid scheme")
     if dest.scheme != "https" and dest.residency.upper() not in ("LOCAL",):

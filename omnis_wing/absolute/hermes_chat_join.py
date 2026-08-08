@@ -418,12 +418,23 @@ def build_envelope_for_chat(
         )
 
     assert payload is not None
-    # R5: sources from full canonical body, not workspace-name theater
+    # R5/M1: sources from full canonical body + taint graph
     from omnis_wing.absolute.payload_policy import analyze_payload_bytes
+    from omnis_wing.absolute.source_taint import propagate_into_messages, merge_taint
 
     body_sources, _frags = analyze_payload_bytes(payload)
     if body_sources:
         sources = body_sources
+    # also explicit message-tree taint (tool results / concat survivors)
+    try:
+        import json as _json
+        _body_obj = _json.loads(payload.decode("utf-8"))
+        if isinstance(_body_obj, dict) and isinstance(_body_obj.get("messages"), list):
+            msg_sources, _merged = propagate_into_messages(_body_obj["messages"])
+            # lattice join classifications via worst of both lists
+            sources = tuple(body_sources) + tuple(msg_sources)
+    except Exception:
+        pass
     env = OutboundEnvelope.create(
         modality="chat",
         lane=lane,
