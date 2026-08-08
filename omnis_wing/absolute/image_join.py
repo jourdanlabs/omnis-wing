@@ -4,19 +4,17 @@ Product vision side-doors remain DISABLED until they call this path via
 TransportBroker.transmit_image. This module is the sole image provider
 dispatch implementation, reachable only under a broker transmit frame.
 
-Destination binding is real: the final sender is either (a) broker-built from
-``client`` (OpenAI-style ``images.generations.create``) or (b) a narrow
-``BoundImageTransport`` whose scheme/host/port/path_class/residency must match
-the destination derived from that same client. Free ``transmit_fn`` callbacks
-are not accepted on the product path — an adapter that targets a different host
-than the authorized client is REFUSE_DESTINATION with zero provider calls.
+Destination binding is real: the final sender is always the broker-owned
+method on the same ``client`` from which the authorized destination is
+derived (``client.images.generations.create`` / ``client.create_image``).
+No caller-supplied transport, callback, adapter, or invoke is accepted on
+the product path — there is no ``transport=`` parameter.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
 from omnis_wing.absolute.envelope import IntendedDestination, OutboundEnvelope
@@ -57,9 +55,6 @@ ALLOWED_IMAGE_KEYS = frozenset(
     }
 )
 
-# Sealed construction token — only make_bound_image_transport / test plant helpers.
-_BOUND_IMAGE_SEAL = object()
-
 
 def canonical_image_body(body: dict) -> tuple[Optional[bytes], Optional[str]]:
     clean = {k: v for k, v in body.items() if not str(k).startswith("__wing")}
@@ -93,7 +88,7 @@ def image_destination_from_client(
 
 
 def _client_images_generations_create(client: Any, body: dict) -> Any:
-    """Broker-owned final image invoke on the bound client object."""
+    """Broker-owned final image invoke on the bound client object only."""
     images = getattr(client, "images", None)
     if images is not None:
         gens = getattr(images, "generations", None)
@@ -106,74 +101,12 @@ def _client_images_generations_create(client: Any, body: dict) -> Any:
     raise RuntimeError("client_lacks_images_generations_create")
 
 
-@dataclass(frozen=True)
-class BoundImageTransport:
-    """Narrow typed image egress handle.
-
-    Endpoint (scheme/host/port), path_class, residency/provider, redirect policy,
-    and invoke target are fixed at construction. Product callers must obtain this
-    via ``make_bound_image_transport(client)`` (sealed). An unsealed or
-    destination-mismatched adapter is refused before any invoke.
-    """
-
-    destination: IntendedDestination
-    _invoke: Callable[[dict], Any] = field(repr=False, compare=False)
-    follow_redirects: bool = False
-    _seal: object = field(default=None, repr=False, compare=False)
-
-    def binding_tuple(self) -> tuple:
-        return self.destination.binding_tuple()
-
-    def is_sealed(self) -> bool:
-        return self._seal is _BOUND_IMAGE_SEAL
-
-    def invoke(self, body: dict) -> Any:
-        if self.follow_redirects:
-            raise RuntimeError("image_transport_redirects_forbidden")
-        return self._invoke(body)
-
-
-def make_bound_image_transport(client: Any) -> BoundImageTransport:
-    """Only legal product factory: bind invoke to ``client`` + derived dest."""
-    ok_redir, redir_reason = assert_no_redirect_transport(client)
-    if not ok_redir:
-        raise ValueError(redir_reason or "redirect_enabled")
-    dest, derr = image_destination_from_client(client)
-    if derr or dest is None:
-        raise ValueError(derr or "destination_derive_failed")
-
-    def _invoke(body: dict) -> Any:
-        return _client_images_generations_create(client, body)
-
-    return BoundImageTransport(
-        destination=dest,
-        follow_redirects=False,
-        _invoke=_invoke,
-        _seal=_BOUND_IMAGE_SEAL,
-    )
-
-
-def plant_bound_image_transport_for_tests(
-    *,
-    destination: IntendedDestination,
-    invoke: Callable[[dict], Any],
-    follow_redirects: bool = False,
-    sealed: bool = True,
-) -> BoundImageTransport:
-    """Test-only constructor (can-fail plants). Not a product API."""
-    return BoundImageTransport(
-        destination=destination,
-        follow_redirects=follow_redirects,
-        _invoke=invoke,
-        _seal=_BOUND_IMAGE_SEAL if sealed else object(),
-    )
-
-
 class _ImageBroker:
-    """Owns final image provider dispatch; invoke only on bound transport."""
+    """Owns final image provider dispatch; invoke only on authorized client."""
 
-    def __init__(self, transport: BoundImageTransport):
-        self.transport = transport
+    def __init__(self, client: Any, authorized_dest: IntendedDestination):
+        self.client = client
+        self.authorized_dest = authorized_dest
         self.calls = 0
         self.last_payload: Optional[bytes] = None
         self.last_destination: Optional[tuple] = None
@@ -188,13 +121,11 @@ class _ImageBroker:
         env_binding = envelope.intended_destination.binding_tuple()
         if authorization.destination_binding != env_binding:
             raise RuntimeError("broker_destination_mismatch")
-        # Actual transport must match the authorized destination tuple exactly.
-        if self.transport.binding_tuple() != authorization.destination_binding:
-            raise RuntimeError("image_transport_destination_mismatch")
-        if self.transport.follow_redirects:
-            raise RuntimeError("image_transport_redirects_forbidden")
-        if not self.transport.is_sealed():
-            raise RuntimeError("image_transport_unsealed")
+        # Authorized dest must match the client-derived destination used at join.
+        if self.authorized_dest.binding_tuple() != authorization.destination_binding:
+            raise RuntimeError("image_client_destination_mismatch")
+        if self.authorized_dest.binding_tuple() != env_binding:
+            raise RuntimeError("image_envelope_destination_mismatch")
 
         self.calls += 1
         self.last_payload = bytes(envelope.payload_bytes)
@@ -203,7 +134,8 @@ class _ImageBroker:
         if not isinstance(body, dict):
             raise RuntimeError("canonical_body_not_object")
         self.delivered_body = body
-        self.response = self.transport.invoke(body)
+        # Sole final sender: method on the same client that bound the dest.
+        self.response = _client_images_generations_create(self.client, body)
         return {
             "ok": True,
             "payload_digest": envelope.payload_digest,
@@ -234,15 +166,14 @@ def governed_image_transmit(
     agent: Any,
     body: dict,
     client: Any,
-    transport: Optional[BoundImageTransport] = None,
     wing_ctx: Optional[WingEgressContext] = None,
     route_id: str = "image.governed",
 ) -> Any:
     """Internal image join — only under TransportBroker.transmit_image frame.
 
-    ``client`` is required. Optional ``transport`` must already be bound to the
-    same destination as ``client`` (image path_class); mismatches refuse with
-    zero provider calls. Free callbacks are not accepted.
+    ``client`` is required. Final send is always broker-owned
+    ``client.images.generations.create`` (or ``client.create_image``). There is
+    no transport / callback / adapter parameter.
     """
     from omnis_wing.absolute.broker_guard import require_broker_dispatch
 
@@ -281,39 +212,6 @@ def governed_image_transmit(
         raise _refuse_dest(
             reason=derr or "destination_derive_failed", evidence=evidence
         )
-
-    # Resolve transport: broker-built from client, or caller-supplied bound adapter.
-    if transport is None:
-        try:
-            transport = make_bound_image_transport(client)
-        except ValueError as exc:
-            raise _refuse_dest(reason=str(exc), evidence=evidence) from exc
-    else:
-        if not isinstance(transport, BoundImageTransport):
-            raise _refuse_dest(
-                reason="image_transport_not_bound_type",
-                evidence=evidence,
-                destination=dest.to_dict(),
-            )
-        if transport.follow_redirects:
-            raise _refuse_dest(
-                reason="image_transport_redirect_enabled",
-                evidence=evidence,
-                destination=dest.to_dict(),
-            )
-        if not transport.is_sealed():
-            raise _refuse_dest(
-                reason="image_transport_unsealed",
-                evidence=evidence,
-                destination=dest.to_dict(),
-            )
-        # Exact destination binding: adapter must target authorized client endpoint.
-        if transport.binding_tuple() != dest.binding_tuple():
-            raise _refuse_dest(
-                reason="image_transport_destination_mismatch",
-                evidence=evidence,
-                destination=dest.to_dict(),
-            )
 
     payload, err = canonical_image_body(body)
     if err:
@@ -365,10 +263,10 @@ def governed_image_transmit(
             signed = None
         raise WingRefusal(refuse_tr, signed=signed)
 
-    # Re-check transport vs authorization after PERMIT (post-auth binding).
-    if transport.binding_tuple() != authorization.destination_binding:
+    # Post-auth: authorized destination must still match client-derived dest.
+    if dest.binding_tuple() != authorization.destination_binding:
         raise _refuse_dest(
-            reason="image_transport_destination_mismatch_post_auth",
+            reason="image_client_destination_mismatch_post_auth",
             evidence=evidence,
             destination=dest.to_dict(),
         )
@@ -384,11 +282,11 @@ def governed_image_transmit(
             )
         ) from exc
 
-    br = _ImageBroker(transport)
+    br = _ImageBroker(client, dest)
     try:
         br.transmit(envelope, authorization)
     except RuntimeError as exc:
-        # Binding / seal failures after PERMIT must not count as a successful send.
+        # Binding failures after PERMIT must not count as a successful send.
         if br.calls == 0:
             raise _refuse_dest(
                 reason=str(exc),

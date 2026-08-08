@@ -93,17 +93,15 @@ class TransportBroker:
         agent: Any,
         body: dict,
         client: Any,
-        transport: Any = None,
         route_id: str = "image.governed",
         wing_ctx: Any = None,
     ) -> Any:
         """GOVERNED image join.
 
-        ``client`` is required. Final send is broker-owned
-        (``client.images.generations.create``) or a sealed
-        ``BoundImageTransport`` whose destination binding must match the
-        destination derived from ``client``. Free ``transmit_fn`` callbacks
-        are not accepted.
+        ``client`` is required. Final send is always broker-owned
+        ``client.images.generations.create`` (or ``client.create_image``) on
+        that same client. No ``transport`` / callback / adapter parameter is
+        accepted — caller-supplied egress substitution is impossible by API.
         """
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
@@ -111,7 +109,6 @@ class TransportBroker:
             agent=agent,
             body=body,
             client=client,
-            transport=transport,
             route_id=route_id,
             wing_ctx=wing_ctx,
         )

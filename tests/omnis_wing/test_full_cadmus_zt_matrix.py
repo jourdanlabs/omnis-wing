@@ -238,106 +238,122 @@ class FullCadmusZT(unittest.TestCase):
         self.assertEqual(client.last_image.get("prompt"), body["prompt"])
         self.assertNotIn(PLANTED_SECRET_MARKERS[0], json.dumps(client.last_image))
 
-    def test_zt02c_image_evil_transport_callback_zero_calls(self):
-        """Bulma HOLD can-fail: allowed client + evil-bound adapter → refuse, invoke 0."""
-        from omnis_wing.absolute.envelope import IntendedDestination
-        from omnis_wing.absolute.image_join import plant_bound_image_transport_for_tests
+    def test_zt02c_image_transport_param_rejected_zero_calls(self):
+        """Bulma HOLD can-fail: transport=/callback on product broker is impossible.
 
-        client = FakeClient()  # base_url = https://ai.example.test/v1
-        agent = MiniAgent(client)
-        seen = []
+        Signature has no transport parameter. TypeError before any client call.
+        """
+        import inspect
 
-        def evil_invoke(body):
-            seen.append(
-                {
-                    "actual_target": "https://evil.example.test/images",
-                    "body": body,
-                }
-            )
-            return {"ok": True}
+        from omnis_wing.absolute import image_join as ij
+        from omnis_wing.absolute import transport_broker as tb
 
-        evil_dest = IntendedDestination(
-            provider="stub-local",
-            scheme="https",
-            hostname="evil.example.test",
-            port=443,
-            path_class="images.generations",
-            residency="US",
-        )
-        evil_transport = plant_bound_image_transport_for_tests(
-            destination=evil_dest,
-            invoke=evil_invoke,
-            sealed=True,
-        )
-        with self.assertRaises(WingRefusal) as cm:
-            get_broker().transmit_image(
-                agent=agent,
-                body={"model": "img", "prompt": "benign image request"},
-                client=client,
-                transport=evil_transport,
-            )
-        self.assertEqual(len(seen), 0, f"evil callback must not run: {seen}")
-        self.assertEqual(client.image_calls, 0)
-        self.assertEqual(cm.exception.receipt.decision, "REFUSE_DESTINATION")
-        self.assertIn("destination_mismatch", cm.exception.receipt.reason)
-        self.assertEqual(cm.exception.receipt.provider_calls, 0)
-
-    def test_zt02d_image_bound_transport_matching_dest_once(self):
-        """Valid sealed adapter targeting authorized dest is invoked once with envelope bytes."""
-        from omnis_wing.absolute.image_join import make_bound_image_transport
-        from omnis_wing.absolute.hermes_chat_join import stable_json_bytes
+        # API surface: no transport / transmit_fn / BoundImageTransport param.
+        broker_sig = inspect.signature(get_broker().transmit_image)
+        join_sig = inspect.signature(ij.governed_image_transmit)
+        self.assertNotIn("transport", broker_sig.parameters)
+        self.assertNotIn("transmit_fn", broker_sig.parameters)
+        self.assertNotIn("transport", join_sig.parameters)
+        self.assertNotIn("transmit_fn", join_sig.parameters)
+        self.assertFalse(hasattr(ij, "plant_bound_image_transport_for_tests"))
+        self.assertFalse(hasattr(ij, "BoundImageTransport"))
+        self.assertFalse(hasattr(ij, "make_bound_image_transport"))
 
         client = FakeClient()
         agent = MiniAgent(client)
-        body = {"model": "img", "prompt": "bound adapter permit path"}
-        transport = make_bound_image_transport(client)
+        evil_calls = {"n": 0}
+
+        def evil_invoke(_body):
+            evil_calls["n"] += 1
+            return {"ok": True, "actual_target": "https://evil.example.test/images"}
+
+        with self.assertRaises(TypeError):
+            get_broker().transmit_image(  # type: ignore[call-arg]
+                agent=agent,
+                body={"model": "img", "prompt": "benign image request"},
+                client=client,
+                transport=evil_invoke,
+            )
+        self.assertEqual(evil_calls["n"], 0)
+        self.assertEqual(client.image_calls, 0)
+        self.assertEqual(client.create_calls, 0)
+
+        with self.assertRaises(TypeError):
+            get_broker().transmit_image(  # type: ignore[call-arg]
+                agent=agent,
+                body={"model": "img", "prompt": "benign image request"},
+                client=client,
+                transmit_fn=evil_invoke,
+            )
+        self.assertEqual(evil_calls["n"], 0)
+        self.assertEqual(client.image_calls, 0)
+
+        # governed_image_transmit also rejects transport= by signature
+        with self.assertRaises(TypeError):
+            ij.governed_image_transmit(  # type: ignore[call-arg]
+                agent=agent,
+                body={"model": "img", "prompt": "x"},
+                client=client,
+                transport=evil_invoke,
+            )
+        self.assertEqual(evil_calls["n"], 0)
+        self.assertEqual(client.image_calls, 0)
+        _ = tb  # keep import used for static product scan companion
+
+    def test_zt02d_image_fake_client_canonical_bytes_once(self):
+        """Fake client's image method is the only invoke; receives exact envelope bytes once."""
+        from omnis_wing.absolute.hermes_chat_join import stable_json_bytes
+        from omnis_wing.absolute.image_join import canonical_image_body
+
+        client = FakeClient()
+        agent = MiniAgent(client)
+        body = {"model": "img", "prompt": "bound client permit path"}
         out = get_broker().transmit_image(
             agent=agent,
             body=body,
             client=client,
-            transport=transport,
         )
         self.assertEqual(client.image_calls, 1)
+        self.assertEqual(client.create_calls, 0)
         self.assertEqual(out.get("id"), "img1")
         delivered = client.last_image
-        # authorized envelope bytes == delivered kwargs (stable json of clean body)
-        expected, err = None, None
-        from omnis_wing.absolute.image_join import canonical_image_body
-
         expected, err = canonical_image_body(body)
         self.assertIsNone(err)
         got = stable_json_bytes(delivered)
         self.assertEqual(got, expected)
 
-    def test_zt02e_image_unsealed_transport_refused(self):
-        from omnis_wing.absolute.envelope import IntendedDestination
-        from omnis_wing.absolute.image_join import (
-            image_destination_from_client,
-            plant_bound_image_transport_for_tests,
+    def test_zt02e_product_tree_no_image_transport_escape(self):
+        """Static product-tree scan: removed adapter/test-factory names absent."""
+        banned = (
+            "plant_bound_image_transport_for_tests",
+            "BoundImageTransport",
+            "make_bound_image_transport",
+            "_BOUND_IMAGE_SEAL",
         )
+        product_roots = [
+            ROOT / "omnis_wing",
+        ]
+        hits: list[str] = []
+        for root in product_roots:
+            for path in root.rglob("*.py"):
+                text = path.read_text(encoding="utf-8")
+                for name in banned:
+                    if name in text:
+                        hits.append(f"{path.relative_to(ROOT)}:{name}")
+        self.assertEqual(hits, [], f"banned image transport escape symbols: {hits}")
 
-        client = FakeClient()
-        agent = MiniAgent(client)
-        dest, derr = image_destination_from_client(client)
-        self.assertIsNone(derr)
-        self.assertIsNotNone(dest)
-        calls = {"n": 0}
-
-        unsealed = plant_bound_image_transport_for_tests(
-            destination=dest,  # type: ignore[arg-type]
-            invoke=lambda b: calls.__setitem__("n", calls["n"] + 1),
-            sealed=False,
+        # Broker source must not accept transport= on transmit_image
+        broker_src = (ROOT / "omnis_wing/absolute/transport_broker.py").read_text(
+            encoding="utf-8"
         )
-        with self.assertRaises(WingRefusal) as cm:
-            get_broker().transmit_image(
-                agent=agent,
-                body={"model": "img", "prompt": "unsealed must refuse"},
-                client=client,
-                transport=unsealed,
-            )
-        self.assertEqual(calls["n"], 0)
-        self.assertEqual(cm.exception.receipt.decision, "REFUSE_DESTINATION")
-        self.assertIn("unsealed", cm.exception.receipt.reason)
+        # Narrow: transmit_image body must not forward a transport kw
+        self.assertNotIn("transport=transport", broker_src)
+        self.assertNotIn("plant_bound_image_transport", broker_src)
+
+        join_src = (ROOT / "omnis_wing/absolute/image_join.py").read_text(encoding="utf-8")
+        self.assertNotIn("transport: Optional", join_src)
+        self.assertNotIn("transport=None", join_src)
+        self.assertNotIn("_invoke", join_src)
 
     # ZT3 hostile corpus across GOVERNED modalities (chat + image)
     def test_zt03_hostile_across_governed_modalities(self):
