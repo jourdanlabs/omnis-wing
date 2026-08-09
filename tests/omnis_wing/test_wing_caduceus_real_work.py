@@ -24,6 +24,7 @@ bootstrap_wing_test_env()
 from omnis_wing.absolute.envelope import SourceProvenance  # noqa: E402
 from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
     EvidenceSession,
+    OutcomeUnknownError,
     WingEgressContext,
     WingRefusal,
 )
@@ -40,15 +41,26 @@ from omnis_wing.absolute.real_work.caduceus_client import (  # noqa: E402
 )
 from omnis_wing.absolute.real_work.config import (  # noqa: E402
     PINNED_CADUCEUS_COMMIT,
+    RealWorkConfigError,
     parse_real_work_config,
 )
 from omnis_wing.absolute.real_work.contract import ROUTE_TABLE, assert_route_honest  # noqa: E402
 from omnis_wing.absolute.real_work.runtime import (  # noqa: E402
     real_work_required,
     transmit_primary_chat,
+    transmit_primary_stream,
 )
-from omnis_wing.absolute.receipt_spine import EvidenceLedger, make_test_signer  # noqa: E402
+from omnis_wing.absolute.receipt_spine import (  # noqa: E402
+    EvidenceLedger,
+    EvidencePersistError,
+    UnavailableSigner,
+    make_test_signer,
+)
 from omnis_wing.absolute.transport_broker import TransportBroker, reset_broker_for_tests  # noqa: E402
+from omnis_wing.absolute.broker_guard import (  # noqa: E402
+    BrokerViolation,
+    assert_real_work_local_transport_only,
+)
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 
 
@@ -75,7 +87,7 @@ def _cfg():
                 "hostname": "api.minimax.io",
                 "port": 443,
                 "path": "/v1/chat/completions",
-                "model": "MiniMax-M2",
+                "model": "MiniMax-M3",
                 "residency": "CN",
                 "api_shape": "openai_chat_completions",
                 "lane": "codegen",
@@ -295,6 +307,28 @@ class RealPathAgent:
         return None
 
 
+class FailingLedger:
+    def __init__(self, base: EvidenceLedger, *, fail_on_append: int):
+        self.base = base
+        self.fail_on_append = fail_on_append
+        self.append_count = 0
+
+    def ensure_appendable(self):
+        return self.base.ensure_appendable()
+
+    def head_digest(self):
+        return self.base.head_digest()
+
+    def next_sequence(self):
+        return self.base.next_sequence()
+
+    def append(self, value):
+        self.append_count += 1
+        if self.append_count == self.fail_on_append:
+            raise EvidencePersistError("planted_append_failure")
+        return self.base.append(value)
+
+
 class WingCaduceusRealWorkTests(unittest.TestCase):
     def setUp(self) -> None:
         bootstrap_wing_test_env()
@@ -306,12 +340,12 @@ class WingCaduceusRealWorkTests(unittest.TestCase):
         self.fake = FakeCaduceusHttp()
         self.cfg = _cfg()
         self.client = CaduceusRealWorkClient(self.cfg, token=TOKEN, http_request=self.fake)
-        ledger_path = Path(os.environ.get("TMPDIR", "/tmp")) / f"wing-rw-ledger-{os.getpid()}.jsonl"
-        if ledger_path.exists():
-            ledger_path.unlink()
+        self.ledger_path = Path(os.environ.get("TMPDIR", "/tmp")) / f"wing-rw-ledger-{os.getpid()}.jsonl"
+        if self.ledger_path.exists():
+            self.ledger_path.unlink()
         self.evidence = EvidenceSession(
             signer=make_test_signer(),
-            ledger=EvidenceLedger(ledger_path),
+            ledger=EvidenceLedger(self.ledger_path),
         )
         self.sources = (
             SourceProvenance(
@@ -336,11 +370,31 @@ class WingCaduceusRealWorkTests(unittest.TestCase):
 
     def test_admission_and_routes(self) -> None:
         assert_contract_not_drifted()
+        with self.assertRaises(AssertionError):
+            assert_contract_not_drifted(expected_corpus="0" * 64)
         m = admission_manifest()
         self.assertEqual(m["policy_id"], "TERMINUS_REAL_WORK_V1")
         assert_route_honest("wing.chat_join", "GOVERNED")
         self.assertEqual(ROUTE_TABLE["wing.image_join"], "DISABLED")
         self.assertEqual(ROUTE_TABLE["wing.chat_join_direct_provider"], "DISABLED")
+        assert_real_work_local_transport_only(ROOT)
+
+    def test_dynamic_transport_import_plant_turns_guard_red(self) -> None:
+        import tempfile
+
+        root = Path(tempfile.mkdtemp(prefix="wing-transport-plant-"))
+        base = root / "omnis_wing" / "absolute" / "real_work"
+        base.mkdir(parents=True)
+        plant = base / "planted_transport.py"
+        plant.write_text(
+            "import importlib\n"
+            "name = 'http' + 'x'\n"
+            "def bypass(): return importlib.import_module(name)\n",
+            encoding="utf-8",
+        )
+        with self.assertRaises(BrokerViolation):
+            assert_real_work_local_transport_only(root)
+        assert_real_work_local_transport_only(ROOT)
 
     def test_client_transformed_happy_path(self) -> None:
         self.fake.mode = "TRANSFORMED"
@@ -437,6 +491,101 @@ class WingCaduceusRealWorkTests(unittest.TestCase):
                 workspace_identity="ws",
             )
 
+    def test_signer_and_ledger_fail_before_local_caduceus_request(self) -> None:
+        no_signer = WingEgressContext(
+            sources=self.sources,
+            evidence=EvidenceSession(
+                signer=UnavailableSigner(),
+                ledger=EvidenceLedger(self.ledger_path),
+            ),
+        )
+        with self.assertRaises(WingRefusal):
+            transmit_primary_chat(
+                agent=self.agent,
+                api_kwargs={"messages": [{"role": "user", "content": "protected"}]},
+                wing_ctx=no_signer,
+            )
+        self.assertEqual(self.client.calls, 0)
+
+        unsafe = WingEgressContext(
+            sources=self.sources,
+            evidence=EvidenceSession(
+                signer=make_test_signer(),
+                ledger=FailingLedger(EvidenceLedger(self.ledger_path), fail_on_append=1),
+            ),
+        )
+        with self.assertRaises(WingRefusal):
+            transmit_primary_chat(
+                agent=self.agent,
+                api_kwargs={"messages": [{"role": "user", "content": "protected"}]},
+                wing_ctx=unsafe,
+            )
+        self.assertEqual(self.client.calls, 0)
+
+    def test_post_provider_terminal_failure_is_outcome_unknown(self) -> None:
+        ledger = FailingLedger(EvidenceLedger(self.ledger_path), fail_on_append=2)
+        ctx = WingEgressContext(
+            sources=self.sources,
+            evidence=EvidenceSession(signer=make_test_signer(), ledger=ledger),
+        )
+        with self.assertRaises(OutcomeUnknownError) as cm:
+            transmit_primary_chat(
+                agent=self.agent,
+                api_kwargs={"messages": [{"role": "user", "content": "protected"}]},
+                wing_ctx=ctx,
+            )
+        self.assertEqual(cm.exception.client_calls, 1)
+        self.assertEqual(len(self.fake.provider_bodies), 1)
+        self.assertEqual(self.agent.wing_real_work_status["state"], "OUTCOME_UNKNOWN")
+
+    def test_response_gate_runtime_writes_failure_terminal(self) -> None:
+        self.fake.response_marker = True
+        with self.assertRaises(WingRefusal):
+            transmit_primary_chat(
+                agent=self.agent,
+                api_kwargs={"messages": [{"role": "user", "content": "protected"}]},
+                wing_ctx=self.ctx,
+            )
+        rows = [json.loads(line) for line in self.ledger_path.read_text().splitlines() if line]
+        self.assertEqual([r["phase"] for r in rows], [
+            "TRANSMISSION_STARTED",
+            "FAILED_AFTER_TRANSMISSION_STARTED",
+        ])
+        self.assertEqual(self.agent.wing_real_work_status["provider_calls"], 1)
+
+    def test_destination_contract_mutations_refuse(self) -> None:
+        base = {
+            "policy_id": "TERMINUS_REAL_WORK_V1",
+            "caduceus_base": "http://127.0.0.1:18787",
+            "caduceus_instance_id": "test-instance",
+            "caduceus_root": "/tmp/caduceus",
+            "caduceus_commit": PINNED_CADUCEUS_COMMIT,
+            "service_token_env": "TEST_CADUCEUS_TOKEN",
+            "target": {
+                "provider": "minimax",
+                "scheme": "https",
+                "hostname": "api.minimax.io",
+                "port": 443,
+                "path": "/v1/chat/completions",
+                "model": "MiniMax-M3",
+                "residency": "CN",
+                "api_shape": "openai_chat_completions",
+                "lane": "codegen",
+            },
+        }
+        for key, bad in (
+            ("hostname", "evil.example"),
+            ("port", 8443),
+            ("model", "other-model"),
+            ("residency", "US"),
+            ("api_shape", "other"),
+            ("lane", "other"),
+        ):
+            planted = json.loads(json.dumps(base))
+            planted["target"][key] = bad
+            with self.assertRaises(RealWorkConfigError, msg=key):
+                parse_real_work_config(planted, source="plant")
+
     def test_runtime_transmit_primary_chat(self) -> None:
         # Planted client is only accepted in test signer mode (runtime._client_for)
         self.fake.mode = "TRANSFORMED"
@@ -456,8 +605,39 @@ class WingCaduceusRealWorkTests(unittest.TestCase):
         st = getattr(self.agent, "wing_real_work_status", {})
         self.assertEqual(st.get("state"), "TRANSFORMED · DELIVERED")
 
+    def test_stream_is_buffered_only_after_same_response_gate(self) -> None:
+        stream = transmit_primary_stream(
+            agent=self.agent,
+            api_kwargs={
+                "messages": [{"role": "user", "content": "protected structure"}],
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            },
+            wing_ctx=self.ctx,
+        )
+        chunks = list(stream)
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0].choices[0].delta.content, "useful minimax-like answer")
+        self.assertEqual(len(self.fake.provider_bodies), 1)
+
     def test_actual_hermes_host_seam_uses_caduceus_and_no_direct_client(self) -> None:
-        agent = RealPathAgent(self.client, self.ctx)
+        # Plant a stale caller-owned generic context. The real host seam must
+        # rebuild provenance from this turn's final body and cannot trust it.
+        stale_generic = WingEgressContext(
+            sources=(
+                SourceProvenance(
+                    path="caller:claimed-generic",
+                    content_digest="c" * 64,
+                    classification="generic",
+                    protected_root=False,
+                    crown_jewel=False,
+                    byte_range=None,
+                    whole_content=True,
+                ),
+            ),
+            evidence=self.evidence,
+        )
+        agent = RealPathAgent(self.client, stale_generic)
         out = interruptible_api_call(
             agent,
             {
@@ -498,7 +678,7 @@ class WingCaduceusRealWorkTests(unittest.TestCase):
                         "hostname": "api.minimax.io",
                         "port": 443,
                         "path": "/v1/chat/completions",
-                        "model": "MiniMax-M2",
+                        "model": "MiniMax-M3",
                         "residency": "CN",
                         "api_shape": "openai_chat_completions",
                         "lane": "codegen",

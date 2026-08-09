@@ -137,7 +137,7 @@ def build_health_report(
         "notes": [
             "Health is observational and cannot clear a failed chain.",
             "storage_state UNVERIFIED_AT_READ must not be read as hardware_backed=true.",
-            "Selected ordinary non-stream chat.completions path only.",
+            "Selected ordinary chat.completions path only; provider streaming is buffered behind the same CADUCEUS response gate.",
         ],
     }
     

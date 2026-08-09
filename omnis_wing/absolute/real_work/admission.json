@@ -14,7 +14,7 @@
     "broker_sha256": "1ad5a9178daef5e6b5a98e3aef1e76cc4f52ec594e872b3d2c9e22d62970b5bf",
     "local_context_sha256": "d7d2c43e21b72011f2bbb7f2f0f13515c689b0b5e8e61883dd1279c930a404ee"
   },
-  "wing_contract_sha256": "f82975380e619bc289c3caee779e7cbf53f057aa08dab8fe99204f6c40bd12c3",
+  "wing_contract_sha256": "92b2747bdae7887f9bb44eb6c24b7a352269c995f6f10dda17b41227fe226172",
   "wing_corpus_sha256": "bd1c2f46646a9a6554c05a575cbd7f0eb58ac8c894ca61a1913a23924cdfeb00",
   "policy_id": "TERMINUS_REAL_WORK_V1"
 }

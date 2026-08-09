@@ -154,7 +154,7 @@ def parse_real_work_config(data: Mapping[str, Any], *, source: str) -> RealWorkC
         or hostname != "api.minimax.io"
         or port != 443
         or path != "/v1/chat/completions"
-        or not model
+        or model != "MiniMax-M3"
         or residency != "CN"
         or api_shape != "openai_chat_completions"
         or lane not in ("plan", "codegen", "validation")

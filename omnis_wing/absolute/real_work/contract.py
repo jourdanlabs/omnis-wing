@@ -30,7 +30,7 @@ ROUTE_TABLE: Mapping[str, str] = {
     "wing.embeddings": "DISABLED",
     "wing.audio": "DISABLED",
     "wing.mcp": "DISABLED",
-    "wing.stream": "DISABLED",
+    "wing.stream": "GOVERNED",  # buffered only after CADUCEUS response gate
     "wing.anthropic": "DISABLED",
     "wing.bedrock": "DISABLED",
     "wing.codex": "DISABLED",

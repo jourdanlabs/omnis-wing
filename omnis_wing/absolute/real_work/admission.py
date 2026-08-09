@@ -7,6 +7,7 @@ intentional pin bump.
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 # Build base (parent of this cutover branch tip at admission)
@@ -32,6 +33,7 @@ POLICY_ID = "TERMINUS_REAL_WORK_V1"
 
 _CORPUS = Path(__file__).with_name("terminus-transform-v1.corpus.json")
 _CONTRACT = Path(__file__).with_name("contract.py")
+_ADMISSION = Path(__file__).with_name("admission.json")
 
 
 def file_sha256(path: Path) -> str:
@@ -39,7 +41,7 @@ def file_sha256(path: Path) -> str:
 
 
 def admission_manifest() -> dict:
-    return {
+    live = {
         "wing_build_base": WING_BUILD_BASE,
         "wing_branch": WING_BRANCH,
         "caduceus_proven_pin": CADUCEUS_PROVEN_PIN,
@@ -51,14 +53,36 @@ def admission_manifest() -> dict:
         "corpus_sha256": file_sha256(_CORPUS) if _CORPUS.is_file() else None,
         "contract_sha256": file_sha256(_CONTRACT) if _CONTRACT.is_file() else None,
     }
+    if _ADMISSION.is_file():
+        live["frozen"] = json.loads(_ADMISSION.read_text(encoding="utf-8"))
+    return live
 
 
 def assert_contract_not_drifted(*, expected_corpus: str | None = None) -> None:
-    """Fail if shared corpus missing or optional expected digest mismatches."""
-    if not _CORPUS.is_file():
-        raise FileNotFoundError(f"missing shared corpus: {_CORPUS}")
-    dig = file_sha256(_CORPUS)
-    if expected_corpus is not None and dig != expected_corpus:
-        raise AssertionError(
-            f"corpus drift: got {dig} expected {expected_corpus}"
-        )
+    """Fail closed against the committed W0 admission, not caller attention."""
+    for path in (_CORPUS, _CONTRACT, _ADMISSION):
+        if not path.is_file() or path.is_symlink():
+            raise FileNotFoundError(f"missing or unsafe admission file: {path}")
+    try:
+        frozen = json.loads(_ADMISSION.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise AssertionError("admission manifest invalid") from exc
+    expected = {
+        "wing_corpus_sha256": file_sha256(_CORPUS),
+        "wing_contract_sha256": file_sha256(_CONTRACT),
+    }
+    if expected_corpus is not None:
+        expected["wing_corpus_sha256"] = expected_corpus
+    for field, got in expected.items():
+        if frozen.get(field) != got:
+            raise AssertionError(
+                f"{field} drift: got {got} expected {frozen.get(field)}"
+            )
+    if frozen.get("wing_base") != WING_BUILD_BASE:
+        raise AssertionError("wing base admission mismatch")
+    if (frozen.get("caduceus") or {}).get("commit") != CADUCEUS_PROVEN_PIN:
+        raise AssertionError("CADUCEUS pin admission mismatch")
+    if (frozen.get("ide_contract") or {}).get("commit") != IDE_CONTRACT_PIN:
+        raise AssertionError("IDE contract pin admission mismatch")
+    if frozen.get("policy_id") != POLICY_ID:
+        raise AssertionError("policy admission mismatch")
