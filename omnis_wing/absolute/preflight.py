@@ -107,14 +107,14 @@ def run_preflight(agent=None) -> PreflightResult:
 
         try:
             from omnis_wing.absolute.real_work.config import (
-                assert_pinned_caduceus_tree,
+                assert_pinned_runtime_dependencies,
                 load_real_work_config,
                 service_capability,
             )
 
             rw = load_real_work_config(require=True)
             assert rw is not None
-            assert_pinned_caduceus_tree(rw)
+            assert_pinned_runtime_dependencies(rw)
             service_capability(rw)
         except Exception as exc:
             errors.append(f"real_work:{type(exc).__name__}:{exc}")

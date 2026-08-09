@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "omnis-wing.operator-run-manifest.v1",
+  "title": "OMNIS WING operator run manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "boundary",
+    "pins",
+    "profile",
+    "signer",
+    "policy",
+    "configuration",
+    "initial_state",
+    "routes",
+    "non_claims"
+  ],
+  "properties": {
+    "schema": {
+      "const": "omnis-wing.operator-run-manifest.v1"
+    },
+    "boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pins": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wing", "caduceus", "omnis_gate", "ide_contract"],
+      "properties": {
+        "wing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commit", "tree", "dirty"],
+          "properties": {
+            "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "dirty": { "const": false }
+          }
+        },
+        "caduceus": {
+          "type": "string",
+          "const": "05c7af0d3e49c73552cd446f3d1884ad40ae40b1"
+        },
+        "omnis_gate": {
+          "type": "string",
+          "const": "02322c52b6e95a8c10fe3ab110ab18dfea59891e"
+        },
+        "ide_contract": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["home", "runtime_mode", "state_files_mode"],
+      "properties": {
+        "home": { "type": "string", "minLength": 1 },
+        "runtime_mode": { "const": "0700" },
+        "state_files_mode": { "const": "0600" }
+      }
+    },
+    "signer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "storage_state",
+        "backend",
+        "key_id",
+        "signature_algorithm",
+        "public_key_sha256"
+      ],
+      "properties": {
+        "state": { "type": "string" },
+        "storage_state": { "type": ["string", "null"] },
+        "backend": { "type": "string" },
+        "key_id": { "type": "string" },
+        "signature_algorithm": { "type": "string" },
+        "public_key_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "version",
+        "digest",
+        "key_id",
+        "require_remote_anchor"
+      ],
+      "properties": {
+        "mode": { "type": "string" },
+        "version": { "type": "string" },
+        "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "key_id": { "type": "string" },
+        "require_remote_anchor": { "type": "boolean" }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "production_config_sha256",
+        "real_work_config_sha256",
+        "caduceus_lanes_sha256",
+        "keychain_bridge_sha256",
+        "caduceus_root",
+        "omnis_gate_root",
+        "caduceus_base",
+        "caduceus_instance_id",
+        "target"
+      ],
+      "properties": {
+        "production_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "real_work_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "caduceus_lanes_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "keychain_bridge_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "caduceus_root": { "type": "string", "minLength": 1 },
+        "omnis_gate_root": { "type": "string", "minLength": 1 },
+        "caduceus_base": {
+          "type": "string",
+          "pattern": "^http://(127\\.0\\.0\\.1|localhost):[0-9]{1,5}$"
+        },
+        "caduceus_instance_id": { "type": "string", "minLength": 1 },
+        "target": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "initial_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wing_ledger_sha256", "caduceus_chain_sha256"],
+      "properties": {
+        "wing_ledger_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "caduceus_chain_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "routes": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["governed", "disabled"],
+      "properties": {
+        "governed": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "disabled": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "summary": { "type": "object" }
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    }
+  },
+  "description": "Content-addressed operator run manifest. Digests and public pin identities only — never credentials, service tokens, API keys, or raw secrets."
+}

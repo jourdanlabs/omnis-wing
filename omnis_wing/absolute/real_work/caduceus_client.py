@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import secrets
+import socket
 import ssl
 import urllib.error
 import urllib.request
@@ -19,6 +20,7 @@ import uuid
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Callable, Mapping, Optional, Sequence
+from urllib.parse import urlsplit
 
 from omnis_wing.absolute.envelope import SourceProvenance
 
@@ -75,6 +77,28 @@ class CaduceusResult:
 
 
 HttpRequest = Callable[[str, str, Mapping[str, str], Optional[bytes], float], HttpResult]
+
+
+def loopback_origin_is_listening(base: str, *, timeout: float = 0.25) -> bool:
+    """True when any process accepts TCP on the exact configured loopback origin.
+
+    Lives in the sole real-work network module so launcher/preflight never import
+    socket themselves. Used only to refuse untrusted port collisions before start.
+    """
+    try:
+        u = urlsplit(base)
+        host = str(u.hostname or "")
+        port = int(u.port or 0)
+    except Exception:
+        return False
+    if host not in ("127.0.0.1", "localhost") or not 1 <= port <= 65535:
+        return False
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.settimeout(timeout)
+    try:
+        return probe.connect_ex((host, port)) == 0
+    finally:
+        probe.close()
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

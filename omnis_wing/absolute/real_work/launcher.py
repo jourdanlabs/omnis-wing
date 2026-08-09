@@ -6,15 +6,17 @@ import argparse
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from .caduceus_client import CaduceusRealWorkClient
+from .caduceus_client import CaduceusRealWorkClient, loopback_origin_is_listening
 from .config import (
     RealWorkConfigError,
-    assert_pinned_caduceus_tree,
+    assert_pinned_runtime_dependencies,
     load_real_work_config,
     service_capability,
 )
@@ -32,7 +34,7 @@ def _runtime_dir() -> Path:
 def _client():
     cfg = load_real_work_config(require=True)
     assert cfg is not None
-    assert_pinned_caduceus_tree(cfg)
+    assert_pinned_runtime_dependencies(cfg)
     token = service_capability(cfg)
     return cfg, CaduceusRealWorkClient(cfg, token=token)
 
@@ -58,13 +60,16 @@ def status() -> dict:
 def ensure_service() -> dict:
     cfg = load_real_work_config(require=True)
     assert cfg is not None
-    assert_pinned_caduceus_tree(cfg)
+    assert_pinned_runtime_dependencies(cfg)
     token = service_capability(cfg)
     client = CaduceusRealWorkClient(cfg, token=token)
     try:
         return {"started": False, **status()}
     except Exception:
         pass
+
+    if loopback_origin_is_listening(cfg.caduceus_base):
+        raise RealWorkConfigError("caduceus_port_collision_untrusted_service")
 
     for name in ("CADUCEUS_LANES", "CADUCEUS_STATE_DIR"):
         if not (os.environ.get(name) or "").strip():
@@ -81,8 +86,6 @@ def ensure_service() -> dict:
     env = dict(os.environ)
     env["CADUCEUS_SERVICE_TOKEN"] = token
     env["CADUCEUS_INSTANCE_ID"] = cfg.caduceus_instance_id
-    from urllib.parse import urlsplit
-
     u = urlsplit(cfg.caduceus_base)
     env["CADUCEUS_HOST"] = str(u.hostname)
     env["CADUCEUS_PORT"] = str(u.port)
@@ -96,12 +99,26 @@ def ensure_service() -> dict:
             stderr=out,
             start_new_session=True,
         )
-    pidfile.write_text(f"{proc.pid}\n", encoding="ascii")
+    try:
+        identity = _process_identity(proc.pid)
+    except Exception:
+        proc.terminate()
+        raise RealWorkConfigError("caduceus_process_identity_unavailable")
+    owner = {
+        "schema": "omnis-wing.caduceus-process-owner.v1",
+        "pid": proc.pid,
+        "process_start": identity["process_start"],
+        "command": identity["command"],
+        "caduceus_commit": cfg.caduceus_commit,
+        "caduceus_base": cfg.caduceus_base,
+    }
+    pidfile.write_text(json.dumps(owner, sort_keys=True) + "\n", encoding="ascii")
     os.chmod(pidfile, 0o600)
     deadline = time.monotonic() + 20.0
     last_error = "not_ready"
     while time.monotonic() < deadline:
         if proc.poll() is not None:
+            pidfile.unlink(missing_ok=True)
             raise RealWorkConfigError(f"caduceus_start_failed_exit_{proc.returncode}")
         try:
             health = client.health()
@@ -110,7 +127,66 @@ def ensure_service() -> dict:
             last_error = type(exc).__name__
             time.sleep(0.2)
     proc.terminate()
+    pidfile.unlink(missing_ok=True)
     raise RealWorkConfigError(f"caduceus_start_timeout:{last_error}")
+
+
+def _process_identity(pid: int) -> dict[str, str]:
+    proc = subprocess.run(
+        ["ps", "-o", "lstart=", "-o", "command=", "-p", str(pid)],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    line = proc.stdout.strip()
+    if not line:
+        raise RealWorkConfigError("caduceus_process_not_running")
+    # lstart is five whitespace-delimited fields; the remainder is argv.
+    parts = line.split(None, 5)
+    if len(parts) != 6:
+        raise RealWorkConfigError("caduceus_process_identity_malformed")
+    return {"process_start": " ".join(parts[:5]), "command": parts[5]}
+
+
+def owned_service_status() -> dict:
+    cfg = load_real_work_config(require=True)
+    assert cfg is not None
+    pidfile = _runtime_dir() / "caduceus.pid"
+    if not pidfile.is_file() or pidfile.is_symlink():
+        raise RealWorkConfigError("caduceus_process_not_owned_by_run")
+    try:
+        owner = json.loads(pidfile.read_text(encoding="ascii"))
+        pid = int(owner["pid"])
+    except Exception as exc:
+        raise RealWorkConfigError("caduceus_process_owner_record_invalid") from exc
+    identity = _process_identity(pid)
+    entry = str(cfg.caduceus_root / "src" / "caduceus.mjs")
+    if (
+        owner.get("schema") != "omnis-wing.caduceus-process-owner.v1"
+        or owner.get("process_start") != identity["process_start"]
+        or owner.get("command") != identity["command"]
+        or owner.get("caduceus_commit") != cfg.caduceus_commit
+        or owner.get("caduceus_base") != cfg.caduceus_base
+        or entry not in identity["command"]
+    ):
+        raise RealWorkConfigError("caduceus_process_ownership_mismatch")
+    return {"owned": True, "pid": pid, **owner}
+
+
+def stop_owned_service() -> dict:
+    owner = owned_service_status()
+    pid = int(owner["pid"])
+    os.kill(pid, signal.SIGTERM)
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            (_runtime_dir() / "caduceus.pid").unlink(missing_ok=True)
+            return {"state": "STOPPED", "pid": pid, "owned": True}
+        time.sleep(0.1)
+    raise RealWorkConfigError("caduceus_owned_process_stop_timeout")
 
 
 def cold_preflight() -> dict:
@@ -134,7 +210,7 @@ def cold_preflight() -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="omnis_wing.absolute.real_work.launcher")
-    p.add_argument("command", choices=("status", "ensure", "preflight"))
+    p.add_argument("command", choices=("status", "ensure", "preflight", "owned", "stop"))
     args = p.parse_args(argv)
     try:
         value = (
@@ -143,6 +219,10 @@ def main(argv: list[str] | None = None) -> int:
             else ensure_service()
             if args.command == "ensure"
             else cold_preflight()
+            if args.command == "preflight"
+            else owned_service_status()
+            if args.command == "owned"
+            else stop_owned_service()
         )
     except Exception as exc:
         print(

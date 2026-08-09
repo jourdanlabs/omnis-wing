@@ -21,6 +21,7 @@ from .contract import REAL_WORK_POLICY_ID
 
 PINNED_CADUCEUS_COMMIT = "05c7af0d3e49c73552cd446f3d1884ad40ae40b1"
 PINNED_IDE_CONTRACT = "b72876528abafb7b0dd54bac4f7b1a7bce75accd"
+PINNED_OMNIS_GATE_COMMIT = "02322c52b6e95a8c10fe3ab110ab18dfea59891e"
 CAPABILITY_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 
@@ -228,7 +229,57 @@ def assert_pinned_caduceus_tree(cfg: RealWorkConfig) -> None:
         ).stdout.strip()
     except Exception as exc:
         raise RealWorkConfigError("caduceus_tree_identity_unavailable") from exc
-    if head != cfg.caduceus_commit:
+    if cfg.caduceus_commit != PINNED_CADUCEUS_COMMIT:
+        raise RealWorkConfigError("caduceus_commit_not_frozen_authority")
+    if head != PINNED_CADUCEUS_COMMIT:
         raise RealWorkConfigError("caduceus_tree_commit_mismatch")
     if status:
         raise RealWorkConfigError("caduceus_tree_tracked_drift")
+
+
+def assert_pinned_omnis_gate_tree(cfg: RealWorkConfig) -> Path:
+    """Verify the exact sibling imported by pinned CADUCEUS.
+
+    CADUCEUS imports ``../../omnis-gate`` from ``src/caduceus.mjs``.  A clean
+    CADUCEUS commit is therefore not a complete runtime identity by itself.
+    The sibling is derived from the real configured root so an operator cannot
+    point this check at one tree while Node imports another.
+    """
+    gate_root = cfg.caduceus_root.parent / "omnis-gate"
+    if gate_root.is_symlink() or not (gate_root / ".git").exists():
+        raise RealWorkConfigError("omnis_gate_sibling_not_git_worktree")
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(gate_root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "-C", str(gate_root), "status", "--porcelain", "--untracked-files=no"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout.strip()
+    except Exception as exc:
+        raise RealWorkConfigError("omnis_gate_tree_identity_unavailable") from exc
+    if head != PINNED_OMNIS_GATE_COMMIT:
+        raise RealWorkConfigError("omnis_gate_tree_commit_mismatch")
+    if status:
+        raise RealWorkConfigError("omnis_gate_tree_tracked_drift")
+    if not (gate_root / "src" / "gate.mjs").is_file():
+        raise RealWorkConfigError("omnis_gate_entry_missing")
+    return gate_root
+
+
+def assert_pinned_runtime_dependencies(cfg: RealWorkConfig) -> Path:
+    """Verify all local source/dependency authority needed to boot CADUCEUS."""
+    assert_pinned_caduceus_tree(cfg)
+    gate_root = assert_pinned_omnis_gate_tree(cfg)
+    if not (cfg.caduceus_root / "src" / "caduceus.mjs").is_file():
+        raise RealWorkConfigError("caduceus_entry_missing")
+    if not (cfg.caduceus_root / "node_modules" / "js-yaml" / "package.json").is_file():
+        raise RealWorkConfigError("caduceus_dependencies_missing_run_npm_ci")
+    return gate_root
