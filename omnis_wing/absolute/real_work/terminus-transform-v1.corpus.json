@@ -1,0 +1,89 @@
+{
+  "schema": "TerminusTransformCorpusV1",
+  "policy_id": "TERMINUS_REAL_WORK_V1",
+  "protocol": "terminus-transform-v1",
+  "provider_neutral": true,
+  "first_adapter": "minimax",
+  "notes": "Shared outcome corpus for CADUCEUS and WING. Safety decisions are not provider-specific.",
+  "cases": [
+    {
+      "id": "generic_permit_raw",
+      "origin_classification": ["generic"],
+      "body": { "messages": [{ "role": "user", "content": "what is 2+2?" }] },
+      "expect": {
+        "delivery_mode": "RAW",
+        "provider_calls": 1,
+        "terminal": "RAW_COMPLETED",
+        "forbidden_substrings": []
+      }
+    },
+    {
+      "id": "secret_in_message",
+      "origin_classification": ["credential"],
+      "body": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "debug with sk-abcdefghijklmnopqrstuvwxyz012345"
+          }
+        ]
+      },
+      "expect": {
+        "delivery_mode_any_of": ["TRANSFORMED", "LOCAL_ONLY"],
+        "provider_calls_max": 1,
+        "never_raw": true,
+        "forbidden_substrings": ["sk-abcdefghijklmnopqrstuvwxyz012345"]
+      }
+    },
+    {
+      "id": "planted_marker",
+      "origin_classification": ["crown_jewel"],
+      "body": {
+        "messages": [
+          { "role": "user", "content": "hold PROJECT-BLUEBIRD-CODENAME" }
+        ]
+      },
+      "expect": {
+        "delivery_mode_any_of": ["TRANSFORMED", "LOCAL_ONLY"],
+        "provider_calls_max": 1,
+        "never_raw": true,
+        "forbidden_substrings": ["PROJECT-BLUEBIRD-CODENAME", "PROJECT-BLUEBIRD"]
+      }
+    },
+    {
+      "id": "protected_source_abstract",
+      "origin_classification": ["protected", "project"],
+      "body": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "fix this:\nimport sys\ndef compute_tax(income):\n    return income * 0.22\nclass Engine:\n    def run(self):\n        return compute_tax(1)\n"
+          }
+        ]
+      },
+      "expect": {
+        "delivery_mode_any_of": ["TRANSFORMED", "LOCAL_ONLY"],
+        "never_raw": true,
+        "forbidden_substrings": ["compute_tax", "income * 0.22"]
+      }
+    },
+    {
+      "id": "expired_policy",
+      "policy_expires_at": "2000-01-01T00:00:00.000Z",
+      "origin_classification": ["generic"],
+      "body": { "messages": [{ "role": "user", "content": "hi" }] },
+      "expect": {
+        "delivery_mode": "LOCAL_ONLY",
+        "provider_calls": 0,
+        "reason": "real_work_policy_expired"
+      }
+    },
+    {
+      "id": "unapproved_fallback",
+      "expect_static": {
+        "default_fallback_destinations": [],
+        "silent_failover": false
+      }
+    }
+  ]
+}
