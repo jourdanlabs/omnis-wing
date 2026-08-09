@@ -170,6 +170,13 @@ def _regular_file_from_env(name: str) -> Path:
     return path
 
 
+def _config_digest(source: str, label: str) -> str:
+    path = Path(source).expanduser()
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise RealWorkConfigError(f"{label}_config_must_be_explicit_regular_file")
+    return _sha256(path)
+
+
 def _git_identity(root: Path) -> dict[str, Any]:
     try:
         head = subprocess.run(
@@ -335,8 +342,10 @@ def prepare(*, compile_bridge: bool = False, write_manifest: bool = True) -> dic
             "require_remote_anchor": policy.require_remote_anchor,
         },
         "configuration": {
-            "production_config_sha256": _sha256(Path(prod.source)),
-            "real_work_config_sha256": _sha256(Path(rw.source)),
+            "production_config_sha256": _config_digest(
+                prod.source, "production"
+            ),
+            "real_work_config_sha256": _config_digest(rw.source, "real_work"),
             "caduceus_lanes_sha256": _sha256(lanes),
             "caduceus_lockfile_sha256": dependency_identity["lockfile_sha256"],
             "caduceus_dependencies_sha256": dependency_identity[

@@ -437,11 +437,14 @@ class OperatorRunbookTests(unittest.TestCase):
             )
 
     def test_dirty_wing_tree_refuses_manifest(self) -> None:
-        with patch.object(runbook, "_git_identity", return_value={"dirty": True}):
-            with self.assertRaisesRegex(RuntimeError, "wing_tree_tracked_or_untracked_drift"):
-                identity = runbook._git_identity(self.root)
-                if identity["dirty"]:
-                    raise rw_config.RealWorkConfigError("wing_tree_tracked_or_untracked_drift")
+        with self.assertRaisesRegex(RuntimeError, "wing_tree_tracked_or_untracked_drift"):
+            runbook._require_clean_wing_identity({"dirty": True})
+
+    def test_env_only_configs_refuse_before_manifest(self) -> None:
+        with self.assertRaisesRegex(
+            RuntimeError, "production_config_must_be_explicit_regular_file"
+        ):
+            runbook._config_digest("env", "production")
 
     def test_default_live_hermes_home_is_refused(self) -> None:
         live = Path.home() / ".hermes"
@@ -526,6 +529,43 @@ class OperatorRunbookTests(unittest.TestCase):
         self.assertEqual(result["state"], "STOPPED")
         self.assertEqual([pid for pid, _sig in calls], [4242, 4242])
         self.assertFalse((runtime / "caduceus.pid").exists())
+
+    def test_stop_refuses_reused_pid_without_signaling(self) -> None:
+        runtime = self.home / "omnis-wing-runtime"
+        runtime.mkdir(mode=0o700)
+        entry = self.root / "assembly" / "caduceus" / "src" / "caduceus.mjs"
+        entry.parent.mkdir(parents=True)
+        entry.write_text("x", encoding="utf-8")
+        cfg = SimpleNamespace(
+            caduceus_root=entry.parents[1],
+            caduceus_commit=rw_config.PINNED_CADUCEUS_COMMIT,
+            caduceus_base="http://127.0.0.1:28791",
+        )
+        owner = {
+            "schema": "omnis-wing.caduceus-process-owner.v1",
+            "pid": 4242,
+            "process_start": "Sat Aug 9 09:00:00 2026",
+            "command": f"/usr/bin/node {entry}",
+            "caduceus_commit": cfg.caduceus_commit,
+            "caduceus_base": cfg.caduceus_base,
+        }
+        (runtime / "caduceus.pid").write_text(json.dumps(owner), encoding="ascii")
+        with (
+            patch.object(launcher, "load_real_work_config", return_value=cfg),
+            patch.object(launcher, "_runtime_dir", return_value=runtime),
+            patch.object(
+                launcher,
+                "_process_identity",
+                return_value={
+                    "process_start": "Sat Aug 9 09:01:00 2026",
+                    "command": owner["command"],
+                },
+            ),
+            patch.object(launcher.os, "kill") as kill,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "caduceus_process_ownership_mismatch"):
+                launcher.stop_owned_service()
+        kill.assert_not_called()
 
     def test_cli_verify_setup_alias_and_secret_scrub(self) -> None:
         os.environ["MINIMAX_API_KEY"] = "sk-live-super-secret-value-xyz"
