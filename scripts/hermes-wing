@@ -8,8 +8,8 @@ set -euo pipefail
 
 # Prefer the worktree / repo that owns this script.
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
-VENV_PY="${OMNIS_WING_VENV_PY:-/Users/sokpyeon/.hermes/hermes-agent/venv/bin/python}"
-PROFILE_HOME="${OMNIS_WING_PROFILE_HOME:-/Users/sokpyeon/.hermes/profiles/videl-wing}"
+VENV_PY="${OMNIS_WING_VENV_PY:-$HOME/.hermes/hermes-agent/venv/bin/python}"
+PROFILE_HOME="${OMNIS_WING_PROFILE_HOME:-$HOME/.hermes/profiles/videl-wing}"
 
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 export HERMES_HOME="$PROFILE_HOME"

@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 VENV_PY="${OMNIS_WING_VENV_PY:-$HOME/.hermes/hermes-agent/venv/bin/python}"
+cd "$ROOT"
 
 if [[ ! -x "$VENV_PY" ]]; then
   echo "missing Python runtime: $VENV_PY" >&2
