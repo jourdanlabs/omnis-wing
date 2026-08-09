@@ -42,6 +42,7 @@ ALLOWED_GOVERNED_MODULES = frozenset(
         "omnis_wing.absolute.universal_egress",
         "omnis_wing.absolute.image_join",
         "omnis_wing.absolute.broker_guard",
+        "omnis_wing.absolute.real_work.caduceus_client",
     }
 )
 
@@ -52,6 +53,7 @@ ALLOWED_PATH_PREFIXES = (
     "omnis_wing/absolute/universal_egress.py",
     "omnis_wing/absolute/image_join.py",
     "omnis_wing/absolute/broker_guard.py",
+    "omnis_wing/absolute/real_work/",
     "tests/",  # tests may instrument / assert
     "omnis_wing/spec/",
     "omnis_wing/completion/route_manifest.json",

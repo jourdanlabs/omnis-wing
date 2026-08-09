@@ -199,6 +199,19 @@ def interruptible_api_call(agent, api_kwargs: dict):
             _wing_tok = set_wing_agent(agent)
             ensure_agent_wing_context(agent, api_kwargs)
             try:
+                from omnis_wing.absolute.real_work.runtime import (
+                    real_work_required,
+                    refuse_non_primary_route,
+                )
+
+                if real_work_required() and agent.api_mode != "chat_completions":
+                    # Refuse before constructing Codex/Anthropic/Bedrock
+                    # clients. The dogfood product has one provider-capable
+                    # route: OpenAI-compatible chat through local CADUCEUS.
+                    refuse_non_primary_route(
+                        agent,
+                        f"agent.interruptible.{agent.api_mode}.non_stream",
+                    )
                 if agent.api_mode == "codex_responses":
                     request_client = _set_request_client(
                         agent._create_request_openai_client(
@@ -269,16 +282,25 @@ def interruptible_api_call(agent, api_kwargs: dict):
                         route_id="agent.interruptible.bedrock_converse.non_stream",
                     )
                 else:
-                    request_client = _set_request_client(
-                        agent._create_request_openai_client(
-                            reason="chat_completion_request",
-                            api_kwargs=api_kwargs,
+                    from omnis_wing.absolute.real_work.runtime import real_work_required
+
+                    if real_work_required():
+                        # CADUCEUS owns the external provider client/socket. Do
+                        # not even construct the legacy direct provider client
+                        # on the production WING path.
+                        request_client = None
+                    else:
+                        request_client = _set_request_client(
+                            agent._create_request_openai_client(
+                                reason="chat_completion_request",
+                                api_kwargs=api_kwargs,
+                            )
                         )
-                    )
                     result["response"] = get_broker().transmit_chat_completions(
                         request_client,
                         api_kwargs,
                         ensure_agent_wing_context(agent, api_kwargs),
+                        agent=agent,
                     )
             finally:
                 reset_wing_agent(_wing_tok)
@@ -1547,9 +1569,10 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
             else:
                 from omnis_wing.absolute.transport_broker import get_broker
                 from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
-                _sc = agent._ensure_primary_openai_client(reason="iteration_limit_summary")
+                from omnis_wing.absolute.real_work.runtime import real_work_required
+                _sc = None if real_work_required() else agent._ensure_primary_openai_client(reason="iteration_limit_summary")
                 summary_response = get_broker().transmit_chat_completions(
-                    _sc, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs)
+                    _sc, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs), agent=agent
                 )
                 _summary_result = agent._get_transport().normalize_response(summary_response)
                 final_response = (_summary_result.content or "").strip()
@@ -1595,9 +1618,10 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
 
                 from omnis_wing.absolute.transport_broker import get_broker
                 from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
-                _sc2 = agent._ensure_primary_openai_client(reason="iteration_limit_summary_retry")
+                from omnis_wing.absolute.real_work.runtime import real_work_required
+                _sc2 = None if real_work_required() else agent._ensure_primary_openai_client(reason="iteration_limit_summary_retry")
                 summary_response = get_broker().transmit_chat_completions(
-                    _sc2, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs)
+                    _sc2, summary_kwargs, ensure_agent_wing_context(agent, summary_kwargs), agent=agent
                 )
                 _retry_result = agent._get_transport().normalize_response(summary_response)
                 final_response = (_retry_result.content or "").strip()
@@ -1670,6 +1694,17 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
     """
     if agent._interrupt_requested:
         raise InterruptedError("Agent interrupted before streaming API call")
+
+    from omnis_wing.absolute.real_work.runtime import (
+        real_work_required,
+        refuse_non_primary_route,
+    )
+
+    if real_work_required() and agent.api_mode != "chat_completions":
+        refuse_non_primary_route(
+            agent,
+            f"agent.interruptible_streaming.{agent.api_mode}",
+        )
 
     if agent.api_mode == "codex_responses":
         # Codex streams internally via _run_codex_stream. The main dispatch
@@ -1912,12 +1947,19 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
                 pool=_conn_cap,
             ),
         }
-        request_client = _set_request_client(
-            agent._create_request_openai_client(
-                reason="chat_completion_stream_request",
-                api_kwargs=stream_kwargs,
+        from omnis_wing.absolute.real_work.runtime import real_work_required
+        if real_work_required():
+            # Provider streaming is folded through CADUCEUS's governed
+            # non-stream response gate. WING emits one already-cleared local
+            # chunk and never constructs a direct provider client.
+            request_client = None
+        else:
+            request_client = _set_request_client(
+                agent._create_request_openai_client(
+                    reason="chat_completion_stream_request",
+                    api_kwargs=stream_kwargs,
+                )
             )
-        )
         # Reset stale-stream timer so the detector measures from this
         # attempt's start, not a previous attempt's last chunk.
         last_chunk_time["t"] = time.time()

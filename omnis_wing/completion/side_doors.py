@@ -94,6 +94,16 @@ ROUTE_MODULES: Dict[str, Tuple[str, ...]] = {
         "plugins.video_gen.xai",
     ),
     "gateway.platform_messaging": (),  # named non-AI
+    # Real-work dogfood: DISABLED routes that are hard-refused at broker/runtime
+    # without needing import stubs of absolute modules (which would break imports).
+    "agent.interruptible.anthropic_messages.non_stream": (),
+    "agent.interruptible.bedrock_converse.non_stream": (),
+    "agent.interruptible.codex_responses.non_stream": (),
+    "agent.interruptible_streaming.bedrock_converse_stream": (),
+    "agent.interruptible_streaming.anthropic": (),
+    "agent.anthropic_adapter.create_message": (),
+    "wing.image.governed": (),
+    "health.provider_probe_no_user_payload": (),
 }
 
 # Plugin-ish modules get deny stubs with generic entry names if absent
@@ -533,6 +543,21 @@ def _evaluate_and_eager_arm() -> None:
             errors.append(f"no_route_mapping:{route_id}")
             continue
         if route_id == "gateway.platform_messaging":
+            routes[route_id] = "NAMED_OK"
+            continue
+
+        # Disabled real-work-only routes with empty module lists: refused at
+        # TransportBroker.refuse_non_primary_route / product_disable, not stubs.
+        if not mods and route_id in {
+            "agent.interruptible.anthropic_messages.non_stream",
+            "agent.interruptible.bedrock_converse.non_stream",
+            "agent.interruptible.codex_responses.non_stream",
+            "agent.interruptible_streaming.bedrock_converse_stream",
+            "agent.interruptible_streaming.anthropic",
+            "agent.anthropic_adapter.create_message",
+            "wing.image.governed",
+            "health.provider_probe_no_user_payload",
+        }:
             routes[route_id] = "NAMED_OK"
             continue
 

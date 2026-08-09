@@ -144,6 +144,20 @@ def ensure_agent_wing_context(agent, api_kwargs: dict | None = None) -> WingEgre
     ensure_side_doors_armed()
 
     ctx = getattr(agent, "wing_egress_context", None)
+    # The real-work join must bind the final request, not reuse a mutable
+    # agent-wide context from an earlier turn. Preserve only the trusted
+    # evidence session; rebuild source provenance from the current body.
+    real_work = bool((os.environ.get("OMNIS_WING_REAL_WORK_CONFIG") or "").strip())
+    if real_work and isinstance(api_kwargs, dict):
+        evidence = getattr(ctx, "evidence", None) if ctx is not None else None
+        fresh = auto_wing_context(agent, body=api_kwargs)
+        if evidence is not None:
+            fresh.evidence = evidence
+        try:
+            agent.wing_egress_context = fresh
+        except Exception:
+            pass
+        return fresh
     if ctx is not None:
         if getattr(ctx, "evidence", None) is None:
             ctx.evidence = resolve_evidence_session(agent)

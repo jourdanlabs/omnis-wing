@@ -57,16 +57,11 @@ def run_preflight(agent=None) -> PreflightResult:
     # manifest complete
     try:
         man = load_manifest()
-        allowed_states = ("GOVERNED", "DISABLED", "OUTSIDE_BOUNDARY")
+        allowed_states = ("GOVERNED", "DISABLED")
         for r in man["routes"]:
             st = r.get("state")
             if st not in allowed_states:
                 errors.append(f"route_bad_state:{r.get('route_id')}:{st}")
-            # OUTSIDE_BOUNDARY requires a concrete non-AI reason
-            if st == "OUTSIDE_BOUNDARY" and not (
-                r.get("outside_reason") or r.get("disable_reason") or r.get("notes")
-            ):
-                errors.append(f"outside_boundary_missing_reason:{r.get('route_id')}")
         if man.get("forbidden_states"):
             for r in man["routes"]:
                 if r.get("state") in man["forbidden_states"]:
@@ -109,6 +104,20 @@ def run_preflight(agent=None) -> PreflightResult:
             errors.append(f"ledger:{exc}")
         except Exception as exc:
             errors.append(f"ledger:{type(exc).__name__}")
+
+        try:
+            from omnis_wing.absolute.real_work.config import (
+                assert_pinned_caduceus_tree,
+                load_real_work_config,
+                service_capability,
+            )
+
+            rw = load_real_work_config(require=True)
+            assert rw is not None
+            assert_pinned_caduceus_tree(rw)
+            service_capability(rw)
+        except Exception as exc:
+            errors.append(f"real_work:{type(exc).__name__}:{exc}")
 
     anchor = resolve_anchor_status(GENESIS_PREV)
     if require_anchor and anchor.state != "VERIFIED":

@@ -241,9 +241,9 @@ class P0_2_BrokerSoleJoinTests(unittest.TestCase):
         br = get_broker()
         orig = br.transmit_chat_completions
 
-        def wrapped(c, kw, ctx):
+        def wrapped(c, kw, ctx, *args, **kwargs):
             hits["n"] += 1
-            return orig(c, kw, ctx)
+            return orig(c, kw, ctx, *args, **kwargs)
 
         br.transmit_chat_completions = wrapped  # type: ignore[method-assign]
         try:

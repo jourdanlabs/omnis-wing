@@ -1,0 +1,17 @@
+# Operator template — NOT a pre-authorized universal egress policy.
+# Copy to a private path and set OMNIS_WING_PRODUCTION_CONFIG / CADUCEUS_LANES.
+#
+# Live MiniMax authorization stays in CADUCEUS terminus_real_work_v1, not here.
+# WING only binds the local CADUCEUS origin.
+
+version: 1
+policy_id: TERMINUS_REAL_WORK_V1
+wing:
+  caduceus_origin_env: OMNIS_WING_CADUCEUS_URL   # must be http://127.0.0.1:<port>
+  caduceus_token_env: OMNIS_WING_CADUCEUS_SERVICE_TOKEN
+  lane: codegen
+  # Direct provider MiniMax from WING is DISABLED. CADUCEUS owns remote sockets.
+  direct_provider_egress: disabled
+notes:
+  - "Do not commit live credentials."
+  - "CADUCEUS lanes.yaml holds destination/model/residency/transform policy."
