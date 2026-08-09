@@ -14,9 +14,13 @@ from pathlib import Path
 WING_BUILD_BASE = "b5bba23a5746aab9a217c4638d67260ccecaa6f4"
 WING_BRANCH = "toph/wing-terminus-real-work-cutover-v1"
 
-# Proven external pins (do not invent)
-CADUCEUS_PROVEN_PIN = "05c7af0d3e49c73552cd446f3d1884ad40ae40b1"
+# Proven external pins (do not invent).
+# Live WING path ancestor used CADUCEUS 05c7af0; product distribution freezes
+# the CODE Wave 4 CADUCEUS pin (contract-compatible under TERMINUS 80874fd).
+CADUCEUS_PROVEN_PIN = "6fe2d1f014bf6da7b3fb99a3c0145a3d9f4576b9"
+CADUCEUS_LIVE_PATH_ANCESTOR_PIN = "05c7af0d3e49c73552cd446f3d1884ad40ae40b1"
 IDE_CONTRACT_PIN = "b72876528abafb7b0dd54bac4f7b1a7bce75accd"
+TERMINUS_CONTRACT_PIN = "80874fd1d326facc6ae6af0416de35f9bdef0a33"
 
 # Live proof digests from Bulma CLEAR package
 LIVE_EVIDENCE_MANIFEST_DIGEST = (

@@ -7,6 +7,8 @@ if [[ ! -x "$VENV_PY" ]]; then
   echo "[omnis-wing-operator] missing Python runtime: $VENV_PY" >&2
   exit 127
 fi
-export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+if [[ -d "$ROOT/omnis_wing" ]]; then
+  export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+fi
 export OMNIS_WING_SIGNER_MODE=production
 exec "$VENV_PY" -m omnis_wing.absolute.real_work.operator_runbook "$@"

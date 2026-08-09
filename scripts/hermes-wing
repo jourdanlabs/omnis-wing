@@ -6,12 +6,15 @@
 # There is no production direct-provider fallback.
 set -euo pipefail
 
-# Prefer the worktree / repo that owns this script.
+# Prefer the worktree / repo that owns this script when present. An installed
+# wheel makes omnis_wing available without PYTHONPATH (use OMNIS_WING_VENV_PY).
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 VENV_PY="${OMNIS_WING_VENV_PY:-$HOME/.hermes/hermes-agent/venv/bin/python}"
 PROFILE_HOME="${OMNIS_WING_PROFILE_HOME:-$HOME/.hermes/profiles/videl-wing}"
 
-export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+if [[ -d "$ROOT/omnis_wing" ]]; then
+  export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+fi
 export HERMES_HOME="$PROFILE_HOME"
 export OMNIS_WING_WORKSPACE="${OMNIS_WING_WORKSPACE:-$HERMES_HOME/workspace}"
 

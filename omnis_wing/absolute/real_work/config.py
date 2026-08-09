@@ -21,15 +21,20 @@ from urllib.parse import urlsplit
 
 from .contract import REAL_WORK_POLICY_ID
 
-PINNED_CADUCEUS_COMMIT = "05c7af0d3e49c73552cd446f3d1884ad40ae40b1"
+# CODE Wave 4 product pin (suite-aligned). Contract-compatible with live WING
+# proof ancestor 05c7af0 under TERMINUS contract 80874fd; dependency identity
+# below is frozen for this exact pin after `npm ci --ignore-scripts`.
+PINNED_CADUCEUS_COMMIT = "6fe2d1f014bf6da7b3fb99a3c0145a3d9f4576b9"
 PINNED_IDE_CONTRACT = "b72876528abafb7b0dd54bac4f7b1a7bce75accd"
 PINNED_OMNIS_GATE_COMMIT = "02322c52b6e95a8c10fe3ab110ab18dfea59891e"
+PINNED_TERMINUS_CONTRACT = "80874fd1d326facc6ae6af0416de35f9bdef0a33"
 PINNED_CADUCEUS_LOCKFILE_SHA256 = (
-    "71f5a193f1d43ec385c9aa8b1462324c5b95bc6f3eeedc266dfdd6f7e1b9b1d1"
+    "bd118b593c88820cd70914732a096e1902d3d2efea9d3e399814ac4e29da3a02"
 )
 PINNED_CADUCEUS_DEPENDENCY_TREE_SHA256 = (
-    "91b22605f41691456a59c9315b6a88afc0ed799844aebbc0cf184ee1ee1f6995"
+    "ba3df4fe8e75eebe283544eaaecd1a0f902bc7c35246b9816b367ab4ea0cd2f5"
 )
+PINNED_CADUCEUS_ASSEMBLY_COMMAND = "npm ci --ignore-scripts"
 CAPABILITY_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 

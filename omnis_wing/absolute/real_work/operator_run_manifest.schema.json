@@ -41,7 +41,7 @@
         },
         "caduceus": {
           "type": "string",
-          "const": "05c7af0d3e49c73552cd446f3d1884ad40ae40b1"
+          "const": "6fe2d1f014bf6da7b3fb99a3c0145a3d9f4576b9"
         },
         "omnis_gate": {
           "type": "string",

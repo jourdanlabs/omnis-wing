@@ -11,16 +11,18 @@ Create one private assembly directory with these sibling worktrees:
 
 ```text
 assembly/
-  caduceus/   05c7af0d3e49c73552cd446f3d1884ad40ae40b1
+  caduceus/   6fe2d1f014bf6da7b3fb99a3c0145a3d9f4576b9   # CODE Wave 4 product pin
   omnis-gate/ 02322c52b6e95a8c10fe3ab110ab18dfea59891e
 ```
 
-Run `npm ci --ignore-scripts` in the clean CADUCEUS worktree. The operator and
-launcher verify the frozen lockfile digest and installed dependency-tree digest;
-a changed or partial `node_modules` tree refuses before process launch. Do not
-move either pin after the operator configuration is written. CADUCEUS imports
-its exact sibling `omnis-gate`; the verifier checks both tracked trees and
-refuses drift.
+The live WING path CLEAR used CADUCEUS `05c7af0d…` under the same TERMINUS
+contract (`80874fd1…`). Product distribution freezes the CODE pin above as the
+suite-aligned, contract-compatible authority. Run `npm ci --ignore-scripts` in
+the clean CADUCEUS worktree. The operator and launcher verify the frozen
+lockfile digest and installed dependency-tree digest; a changed or partial
+`node_modules` tree refuses before process launch. Do not move either pin after
+the operator configuration is written. CADUCEUS imports its exact sibling
+`omnis-gate`; the verifier checks both tracked trees and refuses drift.
 
 ## 2. Create an isolated profile
 
