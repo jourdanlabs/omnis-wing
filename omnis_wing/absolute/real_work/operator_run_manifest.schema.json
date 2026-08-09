@@ -111,6 +111,9 @@
         "production_config_sha256",
         "real_work_config_sha256",
         "caduceus_lanes_sha256",
+        "caduceus_lockfile_sha256",
+        "caduceus_dependencies_sha256",
+        "caduceus_assembly_command",
         "keychain_bridge_sha256",
         "caduceus_root",
         "omnis_gate_root",
@@ -130,6 +133,17 @@
         "caduceus_lanes_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "caduceus_lockfile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "caduceus_dependencies_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "caduceus_assembly_command": {
+          "const": "npm ci --ignore-scripts"
         },
         "keychain_bridge_sha256": {
           "type": "string",

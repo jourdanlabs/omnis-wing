@@ -15,9 +15,12 @@ assembly/
   omnis-gate/ 02322c52b6e95a8c10fe3ab110ab18dfea59891e
 ```
 
-Run `npm ci` in the clean CADUCEUS worktree. Do not move either pin after the
-operator configuration is written. CADUCEUS imports its exact sibling
-`omnis-gate`; the verifier checks both tracked trees and refuses drift.
+Run `npm ci --ignore-scripts` in the clean CADUCEUS worktree. The operator and
+launcher verify the frozen lockfile digest and installed dependency-tree digest;
+a changed or partial `node_modules` tree refuses before process launch. Do not
+move either pin after the operator configuration is written. CADUCEUS imports
+its exact sibling `omnis-gate`; the verifier checks both tracked trees and
+refuses drift.
 
 ## 2. Create an isolated profile
 

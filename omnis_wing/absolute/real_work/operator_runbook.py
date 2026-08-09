@@ -42,6 +42,7 @@ from .config import (
     PINNED_OMNIS_GATE_COMMIT,
     RealWorkConfigError,
     assert_pinned_runtime_dependencies,
+    caduceus_dependency_identity,
     load_real_work_config,
     service_capability,
 )
@@ -91,26 +92,72 @@ def _require_isolated_profile() -> Path:
     raw_profile = (os.environ.get("OMNIS_WING_PROFILE_HOME") or "").strip()
     if not raw_home or not raw_profile:
         raise RealWorkConfigError("isolated_profile_home_required")
-    home = Path(raw_home).expanduser()
-    profile = Path(raw_profile).expanduser()
-    if not home.is_absolute() or not profile.is_absolute() or home != profile:
+    home_input = Path(raw_home).expanduser()
+    profile_input = Path(raw_profile).expanduser()
+    if not home_input.is_absolute() or not profile_input.is_absolute():
         raise RealWorkConfigError("hermes_home_must_equal_omnis_wing_profile_home")
-    if home == Path.home() / ".hermes":
-        raise RealWorkConfigError("live_default_hermes_home_refused")
-    if home.is_symlink():
+    if home_input.is_symlink() or profile_input.is_symlink():
         raise RealWorkConfigError("profile_home_symlink_refused")
+    try:
+        home = home_input.resolve(strict=False)
+        profile = profile_input.resolve(strict=False)
+        live_home = (Path.home() / ".hermes").resolve(strict=False)
+    except (OSError, RuntimeError) as exc:
+        raise RealWorkConfigError("profile_home_resolution_failed") from exc
+    if home != profile:
+        raise RealWorkConfigError("hermes_home_must_equal_omnis_wing_profile_home")
+    if home == live_home:
+        raise RealWorkConfigError("live_default_hermes_home_refused")
     mkdir_private_tree(home)
     inspect_controlled_dir(home)
     return home
 
 
-def _must_be_within(child: Path, parent: Path, reason: str) -> Path:
-    child = Path(os.path.normpath(str(child.expanduser())))
+def _assert_controlled_lineage(child: Path, parent: Path, reason: str) -> Path:
+    """Refuse symlinks in the run-controlled portion of a descendant path."""
     try:
-        child.relative_to(parent)
+        parent = Path(os.path.abspath(str(parent.expanduser()))).resolve(strict=False)
+    except (OSError, RuntimeError) as exc:
+        raise RealWorkConfigError("controlled_path_parent_resolution_failed") from exc
+    child = Path(os.path.abspath(str(child.expanduser())))
+
+    # Rebase an operator spelling such as macOS /var onto the already
+    # canonical profile. Only the system/profile prefix is resolved; controlled
+    # descendant components remain lexical so they can be checked with lstat.
+    raw_home = (os.environ.get("HERMES_HOME") or "").strip()
+    if raw_home:
+        alias_home = Path(os.path.abspath(str(Path(raw_home).expanduser())))
+        try:
+            canonical_home = alias_home.resolve(strict=False)
+            parent_suffix = parent.relative_to(canonical_home)
+            alias_parent = alias_home / parent_suffix
+            child_suffix = child.relative_to(alias_parent)
+        except (OSError, RuntimeError, ValueError):
+            pass
+        else:
+            child = parent / child_suffix
+    try:
+        relative = child.relative_to(parent)
     except ValueError as exc:
         raise RealWorkConfigError(reason) from exc
+    current = parent
+    for part in relative.parts:
+        current = current / part
+        try:
+            mode = current.lstat().st_mode
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise RealWorkConfigError(
+                f"controlled_path_lineage_unreadable:{current}"
+            ) from exc
+        if stat.S_ISLNK(mode):
+            raise RealWorkConfigError(f"controlled_path_symlink_refused:{current}")
     return child
+
+
+def _must_be_within(child: Path, parent: Path, reason: str) -> Path:
+    return _assert_controlled_lineage(child, parent, reason)
 
 
 def _regular_file_from_env(name: str) -> Path:
@@ -163,11 +210,21 @@ def _prepare_bridge(cfg, runtime: Path, *, compile_bridge: bool) -> tuple[Path, 
         raise RealWorkConfigError("wave0_requires_keychain_backend")
     expected = runtime / "bin" / "omnis_wing_keychain"
     bridge = cfg.bridge_path or expected
+    bridge = _must_be_within(
+        bridge, runtime, "keychain_bridge_must_be_inside_run_owned_runtime"
+    )
     if compile_bridge:
         if bridge != expected:
             raise RealWorkConfigError("compiled_bridge_must_use_run_owned_path")
+        _assert_controlled_lineage(
+            expected.parent, runtime, "keychain_bridge_outside_runtime"
+        )
         mkdir_private_tree(expected.parent)
+        _assert_controlled_lineage(
+            expected.parent, runtime, "keychain_bridge_outside_runtime"
+        )
         compile_keychain_bridge(expected.parent)
+    _assert_controlled_lineage(bridge, runtime, "keychain_bridge_outside_runtime")
     if bridge.is_symlink() or not bridge.is_file():
         raise RealWorkConfigError("keychain_bridge_missing_run_compile_bridge")
     mode = stat.S_IMODE(bridge.stat().st_mode)
@@ -191,13 +248,18 @@ def _prepare_bridge(cfg, runtime: Path, *, compile_bridge: bool) -> tuple[Path, 
 
 
 def _prepare_state(home: Path, cfg) -> dict[str, Path]:
-    runtime = home / "omnis-wing-runtime"
+    runtime = _must_be_within(
+        home / "omnis-wing-runtime", home, "runtime_must_be_inside_isolated_profile"
+    )
     mkdir_private_tree(runtime)
+    _assert_controlled_lineage(runtime, home, "runtime_must_be_inside_isolated_profile")
     inspect_controlled_dir(runtime)
     ledger_dir = _must_be_within(
         cfg.ledger_dir, home, "production_ledger_must_be_inside_isolated_profile"
     )
+    _assert_controlled_lineage(ledger_dir, home, "production_ledger_lineage_invalid")
     wing_ledger = prepare_private_ledger_file(ledger_dir / "wing-production-ledger.jsonl")
+    _assert_controlled_lineage(wing_ledger, home, "production_ledger_lineage_invalid")
 
     raw_state = (os.environ.get("CADUCEUS_STATE_DIR") or "").strip()
     if not raw_state:
@@ -205,9 +267,18 @@ def _prepare_state(home: Path, cfg) -> dict[str, Path]:
     caduceus_state = _must_be_within(
         Path(raw_state).expanduser(), home, "caduceus_state_must_be_inside_isolated_profile"
     )
+    _assert_controlled_lineage(caduceus_state, home, "caduceus_state_lineage_invalid")
     mkdir_private_tree(caduceus_state)
     chain = prepare_private_ledger_file(caduceus_state / "chain.jsonl")
+    _assert_controlled_lineage(chain, home, "caduceus_state_lineage_invalid")
     return {"runtime": runtime, "wing_ledger": wing_ledger, "caduceus_chain": chain}
+
+
+def _manifest_path(runtime: Path, digest: str) -> Path:
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise RealWorkConfigError("run_manifest_digest_invalid")
+    path = runtime / "manifests" / f"run-{digest}.json"
+    return _must_be_within(path, runtime, "run_manifest_must_be_inside_run_owned_runtime")
 
 
 def _route_summary() -> dict[str, Any]:
@@ -231,6 +302,7 @@ def prepare(*, compile_bridge: bool = False, write_manifest: bool = True) -> dic
     rw = load_real_work_config(require=True)
     assert rw is not None
     gate_root = assert_pinned_runtime_dependencies(rw)
+    dependency_identity = caduceus_dependency_identity(rw)
     token = service_capability(rw)  # availability/shape only; never serialized
     policy = load_policy()
     lanes = _regular_file_from_env("CADUCEUS_LANES")
@@ -266,6 +338,11 @@ def prepare(*, compile_bridge: bool = False, write_manifest: bool = True) -> dic
             "production_config_sha256": _sha256(Path(prod.source)),
             "real_work_config_sha256": _sha256(Path(rw.source)),
             "caduceus_lanes_sha256": _sha256(lanes),
+            "caduceus_lockfile_sha256": dependency_identity["lockfile_sha256"],
+            "caduceus_dependencies_sha256": dependency_identity[
+                "dependency_tree_sha256"
+            ],
+            "caduceus_assembly_command": dependency_identity["assembly_command"],
             "keychain_bridge_sha256": _sha256(bridge),
             "caduceus_root": str(rw.caduceus_root),
             "omnis_gate_root": str(gate_root),
@@ -289,9 +366,15 @@ def prepare(*, compile_bridge: bool = False, write_manifest: bool = True) -> dic
         if secret and secret.encode("utf-8") in raw:
             raise RealWorkConfigError("credential_material_in_run_manifest")
     digest = hashlib.sha256(raw).hexdigest()
-    path = state["runtime"] / "manifests" / f"run-{digest}.json"
+    path = _manifest_path(state["runtime"], digest)
     if write_manifest:
+        _assert_controlled_lineage(
+            path.parent, state["runtime"], "run_manifest_must_be_inside_run_owned_runtime"
+        )
         mkdir_private_tree(path.parent)
+        _assert_controlled_lineage(
+            path, state["runtime"], "run_manifest_must_be_inside_run_owned_runtime"
+        )
         if path.exists() or path.is_symlink():
             inspect_controlled_file(path)
             if path.read_bytes() != raw:
@@ -336,6 +419,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             from .launcher import stop_owned_service
 
+            _require_isolated_profile()
             result = stop_owned_service()
     except Exception as exc:
         payload = _scrub_public_text(

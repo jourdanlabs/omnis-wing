@@ -8,9 +8,11 @@ never contains a provider credential or the CADUCEUS service capability.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +24,12 @@ from .contract import REAL_WORK_POLICY_ID
 PINNED_CADUCEUS_COMMIT = "05c7af0d3e49c73552cd446f3d1884ad40ae40b1"
 PINNED_IDE_CONTRACT = "b72876528abafb7b0dd54bac4f7b1a7bce75accd"
 PINNED_OMNIS_GATE_COMMIT = "02322c52b6e95a8c10fe3ab110ab18dfea59891e"
+PINNED_CADUCEUS_LOCKFILE_SHA256 = (
+    "71f5a193f1d43ec385c9aa8b1462324c5b95bc6f3eeedc266dfdd6f7e1b9b1d1"
+)
+PINNED_CADUCEUS_DEPENDENCY_TREE_SHA256 = (
+    "91b22605f41691456a59c9315b6a88afc0ed799844aebbc0cf184ee1ee1f6995"
+)
 CAPABILITY_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 
@@ -280,6 +288,74 @@ def assert_pinned_runtime_dependencies(cfg: RealWorkConfig) -> Path:
     gate_root = assert_pinned_omnis_gate_tree(cfg)
     if not (cfg.caduceus_root / "src" / "caduceus.mjs").is_file():
         raise RealWorkConfigError("caduceus_entry_missing")
-    if not (cfg.caduceus_root / "node_modules" / "js-yaml" / "package.json").is_file():
-        raise RealWorkConfigError("caduceus_dependencies_missing_run_npm_ci")
+    caduceus_dependency_identity(cfg)
     return gate_root
+
+
+def _dependency_tree_sha256(caduceus_root: Path, lock: Mapping[str, Any]) -> str:
+    packages = lock.get("packages")
+    if not isinstance(packages, dict):
+        raise RealWorkConfigError("caduceus_lockfile_packages_invalid")
+    dependency_paths = sorted(
+        key
+        for key in packages
+        if isinstance(key, str) and key.startswith("node_modules/")
+    )
+    if not dependency_paths:
+        raise RealWorkConfigError("caduceus_lockfile_dependencies_missing")
+
+    digest = hashlib.sha256()
+    digest.update(b"omnis-wing.caduceus-dependency-tree.v1\0")
+    for dependency_path in dependency_paths:
+        package_root = caduceus_root / dependency_path
+        if package_root.is_symlink() or not package_root.is_dir():
+            raise RealWorkConfigError(
+                "caduceus_dependencies_missing_run_npm_ci_ignore_scripts"
+            )
+        digest.update(b"P\0" + dependency_path.encode("utf-8") + b"\0")
+        for path in sorted(package_root.rglob("*"), key=lambda value: value.as_posix()):
+            relative = path.relative_to(caduceus_root).as_posix().encode("utf-8")
+            try:
+                mode = path.lstat().st_mode
+            except OSError as exc:
+                raise RealWorkConfigError("caduceus_dependency_tree_unreadable") from exc
+            if stat.S_ISLNK(mode):
+                raise RealWorkConfigError("caduceus_dependency_symlink_refused")
+            if stat.S_ISDIR(mode):
+                digest.update(b"D\0" + relative + b"\0")
+                continue
+            if not stat.S_ISREG(mode):
+                raise RealWorkConfigError("caduceus_dependency_non_regular_refused")
+            try:
+                content_digest = hashlib.sha256(path.read_bytes()).digest()
+            except OSError as exc:
+                raise RealWorkConfigError("caduceus_dependency_tree_unreadable") from exc
+            digest.update(b"F\0" + relative + b"\0" + content_digest)
+    return digest.hexdigest()
+
+
+def caduceus_dependency_identity(cfg: RealWorkConfig) -> dict[str, str]:
+    """Bind installed executable dependency bytes to the frozen npm lockfile."""
+    lockfile = cfg.caduceus_root / "package-lock.json"
+    if lockfile.is_symlink() or not lockfile.is_file():
+        raise RealWorkConfigError("caduceus_lockfile_missing")
+    try:
+        lock_bytes = lockfile.read_bytes()
+        lock = json.loads(lock_bytes)
+    except Exception as exc:
+        raise RealWorkConfigError("caduceus_lockfile_invalid") from exc
+    if not isinstance(lock, dict):
+        raise RealWorkConfigError("caduceus_lockfile_invalid")
+    lockfile_sha256 = hashlib.sha256(lock_bytes).hexdigest()
+    if lockfile_sha256 != PINNED_CADUCEUS_LOCKFILE_SHA256:
+        raise RealWorkConfigError("caduceus_lockfile_digest_mismatch")
+    dependency_tree_sha256 = _dependency_tree_sha256(cfg.caduceus_root, lock)
+    if dependency_tree_sha256 != PINNED_CADUCEUS_DEPENDENCY_TREE_SHA256:
+        raise RealWorkConfigError(
+            "caduceus_dependency_tree_mismatch_run_npm_ci_ignore_scripts"
+        )
+    return {
+        "lockfile_sha256": lockfile_sha256,
+        "dependency_tree_sha256": dependency_tree_sha256,
+        "assembly_command": "npm ci --ignore-scripts",
+    }

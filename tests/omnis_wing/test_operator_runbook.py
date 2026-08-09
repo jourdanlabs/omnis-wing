@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import stat
 import sys
 import tempfile
@@ -95,7 +96,23 @@ class OperatorRunbookTests(unittest.TestCase):
             (repo / ".git").mkdir(parents=True, exist_ok=True)
         (caduceus / "src").mkdir(parents=True, exist_ok=True)
         (caduceus / "src" / "caduceus.mjs").write_text("// entry\n", encoding="utf-8")
+        lock = {
+            "name": "caduceus-test",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {"dependencies": {"js-yaml": "4.3.0"}},
+                "node_modules/argparse": {"version": "2.0.1"},
+                "node_modules/js-yaml": {"version": "4.3.0"},
+            },
+        }
+        (caduceus / "package-lock.json").write_text(
+            json.dumps(lock, sort_keys=True) + "\n", encoding="utf-8"
+        )
         if with_deps:
+            (caduceus / "node_modules" / "argparse").mkdir(parents=True, exist_ok=True)
+            (caduceus / "node_modules" / "argparse" / "package.json").write_text(
+                '{"name":"argparse"}\n', encoding="utf-8"
+            )
             (caduceus / "node_modules" / "js-yaml").mkdir(parents=True, exist_ok=True)
             (caduceus / "node_modules" / "js-yaml" / "package.json").write_text(
                 "{}", encoding="utf-8"
@@ -106,6 +123,14 @@ class OperatorRunbookTests(unittest.TestCase):
         self._caduceus_commit = rw_config.PINNED_CADUCEUS_COMMIT
         return caduceus
 
+    def _dependency_pins(self, caduceus: Path) -> tuple[str, str]:
+        lock_bytes = (caduceus / "package-lock.json").read_bytes()
+        lock = json.loads(lock_bytes)
+        return (
+            hashlib.sha256(lock_bytes).hexdigest(),
+            rw_config._dependency_tree_sha256(caduceus, lock),
+        )
+
     def _fake_git_run(self, args, **_kwargs):
         path = " ".join(str(a) for a in args)
         is_gate = "omnis-gate" in path
@@ -114,32 +139,63 @@ class OperatorRunbookTests(unittest.TestCase):
         commit = self._gate_commit if is_gate else self._caduceus_commit
         return SimpleNamespace(stdout=commit + "\n")
 
+    @staticmethod
+    def _tree_bytes(root: Path) -> dict[str, tuple[str, int, bytes]]:
+        snapshot: dict[str, tuple[str, int, bytes]] = {}
+        for path in sorted(root.rglob("*")):
+            mode = path.lstat().st_mode
+            relative = str(path.relative_to(root))
+            if stat.S_ISDIR(mode):
+                snapshot[relative] = ("directory", stat.S_IMODE(mode), b"")
+            elif stat.S_ISREG(mode):
+                snapshot[relative] = ("file", stat.S_IMODE(mode), path.read_bytes())
+            elif stat.S_ISLNK(mode):
+                snapshot[relative] = (
+                    "symlink",
+                    stat.S_IMODE(mode),
+                    os.readlink(path).encode("utf-8"),
+                )
+            else:
+                snapshot[relative] = ("other", stat.S_IMODE(mode), b"")
+        return snapshot
+
     def test_exact_caduceus_and_sibling_gate_pins_are_required(self) -> None:
         caduceus = self._assembly()
         cfg = self._pinned_cfg(caduceus)
-        with patch.object(rw_config.subprocess, "run", side_effect=self._fake_git_run):
+        lock_pin, tree_pin = self._dependency_pins(caduceus)
+        with (
+            patch.object(rw_config, "PINNED_CADUCEUS_LOCKFILE_SHA256", lock_pin),
+            patch.object(rw_config, "PINNED_CADUCEUS_DEPENDENCY_TREE_SHA256", tree_pin),
+            patch.object(rw_config.subprocess, "run", side_effect=self._fake_git_run),
+        ):
             self.assertEqual(
                 rw_config.assert_pinned_runtime_dependencies(cfg),
                 caduceus.parent / "omnis-gate",
             )
 
         self._gate_commit = "0" * 40
-        with patch.object(rw_config.subprocess, "run", side_effect=self._fake_git_run):
+        with (
+            patch.object(rw_config, "PINNED_CADUCEUS_LOCKFILE_SHA256", lock_pin),
+            patch.object(rw_config, "PINNED_CADUCEUS_DEPENDENCY_TREE_SHA256", tree_pin),
+            patch.object(rw_config.subprocess, "run", side_effect=self._fake_git_run),
+        ):
             with self.assertRaisesRegex(RuntimeError, "omnis_gate_tree_commit_mismatch"):
                 rw_config.assert_pinned_runtime_dependencies(cfg)
 
     def test_missing_dependencies_and_sibling_authority_refuse(self) -> None:
         caduceus = self._assembly(with_deps=False)
         cfg = self._pinned_cfg(caduceus)
-        with patch.object(rw_config.subprocess, "run", side_effect=self._fake_git_run):
+        lock_pin = hashlib.sha256((caduceus / "package-lock.json").read_bytes()).hexdigest()
+        with (
+            patch.object(rw_config, "PINNED_CADUCEUS_LOCKFILE_SHA256", lock_pin),
+            patch.object(rw_config.subprocess, "run", side_effect=self._fake_git_run),
+        ):
             with self.assertRaisesRegex(
                 RuntimeError, "caduceus_dependencies_missing_run_npm_ci"
             ):
                 rw_config.assert_pinned_runtime_dependencies(cfg)
 
         # Sibling missing entirely.
-        import shutil
-
         shutil.rmtree(caduceus.parent / "omnis-gate")
         caduceus2 = self.root / "assembly2" / "caduceus"
         (caduceus2 / ".git").mkdir(parents=True)
@@ -154,6 +210,20 @@ class OperatorRunbookTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "omnis_gate_sibling_not_git_worktree"):
                 rw_config.assert_pinned_runtime_dependencies(cfg2)
 
+    def test_mutated_js_yaml_dependency_refuses(self) -> None:
+        caduceus = self._assembly()
+        cfg = self._pinned_cfg(caduceus)
+        lock_pin, tree_pin = self._dependency_pins(caduceus)
+        package = caduceus / "node_modules" / "js-yaml" / "package.json"
+        package.write_text('{"name":"js-yaml","mutation":true}\n', encoding="utf-8")
+        with (
+            patch.object(rw_config, "PINNED_CADUCEUS_LOCKFILE_SHA256", lock_pin),
+            patch.object(rw_config, "PINNED_CADUCEUS_DEPENDENCY_TREE_SHA256", tree_pin),
+            patch.object(rw_config.subprocess, "run", side_effect=self._fake_git_run),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "caduceus_dependency_tree_mismatch"):
+                rw_config.assert_pinned_runtime_dependencies(cfg)
+
     def test_private_state_and_empty_ledgers_are_initialized_honestly(self) -> None:
         cfg = SimpleNamespace(ledger_dir=self.home / "ledgers")
         state = runbook._prepare_state(self.home, cfg)
@@ -162,6 +232,43 @@ class OperatorRunbookTests(unittest.TestCase):
         for path in (state["wing_ledger"], state["caduceus_chain"]):
             self.assertEqual(path.read_bytes(), b"")
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+    def test_ledger_intermediate_symlink_refuses_without_outside_write(self) -> None:
+        outside = self.root / "outside-ledger"
+        outside.mkdir(mode=0o700)
+        (outside / "sentinel").write_bytes(b"ledger-sentinel")
+        before = self._tree_bytes(outside)
+        redirect = self.home / "redirect-ledger"
+        redirect.symlink_to(outside, target_is_directory=True)
+        cfg = SimpleNamespace(ledger_dir=redirect / "ledgers")
+        with self.assertRaisesRegex(RuntimeError, "controlled_path_symlink_refused"):
+            runbook._prepare_state(self.home, cfg)
+        self.assertEqual(self._tree_bytes(outside), before)
+
+    def test_state_intermediate_symlink_refuses_without_outside_write(self) -> None:
+        outside = self.root / "outside-state"
+        outside.mkdir(mode=0o700)
+        (outside / "sentinel").write_bytes(b"state-sentinel")
+        before = self._tree_bytes(outside)
+        redirect = self.home / "redirect-state"
+        redirect.symlink_to(outside, target_is_directory=True)
+        os.environ["CADUCEUS_STATE_DIR"] = str(redirect / "caduceus")
+        cfg = SimpleNamespace(ledger_dir=self.home / "ledgers")
+        with self.assertRaisesRegex(RuntimeError, "controlled_path_symlink_refused"):
+            runbook._prepare_state(self.home, cfg)
+        self.assertEqual(self._tree_bytes(outside), before)
+
+    def test_manifest_directory_symlink_refuses_without_outside_write(self) -> None:
+        outside = self.root / "outside-manifests"
+        outside.mkdir(mode=0o700)
+        (outside / "sentinel").write_bytes(b"manifest-sentinel")
+        before = self._tree_bytes(outside)
+        runtime = self.home / "omnis-wing-runtime"
+        runtime.mkdir(mode=0o700)
+        (runtime / "manifests").symlink_to(outside, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, "controlled_path_symlink_refused"):
+            runbook._manifest_path(runtime, "a" * 64)
+        self.assertEqual(self._tree_bytes(outside), before)
 
     def test_bridge_status_is_read_without_enrollment_or_signing(self) -> None:
         runtime = self.home / "omnis-wing-runtime"
@@ -176,9 +283,29 @@ class OperatorRunbookTests(unittest.TestCase):
             got_bridge, status_value = runbook._prepare_bridge(
                 cfg, runtime, compile_bridge=False
             )
-        self.assertEqual(got_bridge, bridge)
+        self.assertEqual(got_bridge, bridge.resolve())
         self.assertEqual(status_value["state"], "ENROLLED")
         self.assertEqual(backend.enroll_calls, 0)
+
+    def test_bridge_directory_symlink_refuses_without_outside_write(self) -> None:
+        runtime = self.home / "omnis-wing-runtime"
+        runtime.mkdir(mode=0o700)
+        outside = self.root / "outside-bridge"
+        outside.mkdir(mode=0o700)
+        bridge = outside / "omnis_wing_keychain"
+        bridge.write_bytes(b"bridge-sentinel")
+        bridge.chmod(0o700)
+        before = self._tree_bytes(outside)
+        (runtime / "bin").symlink_to(outside, target_is_directory=True)
+        cfg = SimpleNamespace(
+            backend="keychain",
+            bridge_path=runtime / "bin" / "omnis_wing_keychain",
+        )
+        adapter = ProductionSignerAdapter(backend=_ReadyBackend())
+        with patch.object(runbook, "build_signer_from_config", return_value=adapter):
+            with self.assertRaisesRegex(RuntimeError, "controlled_path_symlink_refused"):
+                runbook._prepare_bridge(cfg, runtime, compile_bridge=False)
+        self.assertEqual(self._tree_bytes(outside), before)
 
     def test_signer_lock_refuses_without_enrollment(self) -> None:
         runtime = self.home / "omnis-wing-runtime"
@@ -245,6 +372,15 @@ class OperatorRunbookTests(unittest.TestCase):
             patch.object(runbook, "load_production_config", return_value=prod),
             patch.object(runbook, "load_real_work_config", return_value=rw),
             patch.object(runbook, "assert_pinned_runtime_dependencies", return_value=gate),
+            patch.object(
+                runbook,
+                "caduceus_dependency_identity",
+                return_value={
+                    "lockfile_sha256": "e" * 64,
+                    "dependency_tree_sha256": "f" * 64,
+                    "assembly_command": "npm ci --ignore-scripts",
+                },
+            ),
             patch.object(runbook, "service_capability", return_value="local-service-secret-token"),
             patch.object(runbook, "load_policy", return_value=policy),
             patch.object(runbook, "_prepare_bridge", return_value=(bridge, signer)),
@@ -313,6 +449,27 @@ class OperatorRunbookTests(unittest.TestCase):
         os.environ["OMNIS_WING_PROFILE_HOME"] = str(live)
         with self.assertRaisesRegex(RuntimeError, "live_default_hermes_home_refused"):
             runbook._require_isolated_profile()
+
+    def test_equivalent_live_hermes_dotdot_alias_is_refused_before_preparation(self) -> None:
+        live_alias = Path.home() / ".hermes" / ".." / ".hermes"
+        os.environ["HERMES_HOME"] = str(live_alias)
+        os.environ["OMNIS_WING_PROFILE_HOME"] = str(live_alias)
+        with (
+            patch.object(runbook, "mkdir_private_tree") as mkdir,
+            patch.object(runbook, "inspect_controlled_dir") as inspect,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "live_default_hermes_home_refused"):
+                runbook._require_isolated_profile()
+        mkdir.assert_not_called()
+        inspect.assert_not_called()
+
+    def test_stop_command_refuses_equivalent_live_alias_before_launcher(self) -> None:
+        live_alias = Path.home() / ".hermes" / ".." / ".hermes"
+        os.environ["HERMES_HOME"] = str(live_alias)
+        os.environ["OMNIS_WING_PROFILE_HOME"] = str(live_alias)
+        with patch.object(launcher, "stop_owned_service") as stop:
+            self.assertEqual(runbook.main(["stop"]), 2)
+        stop.assert_not_called()
 
     def test_port_collision_refuses_before_start(self) -> None:
         cfg = SimpleNamespace(caduceus_base="http://127.0.0.1:28791")
