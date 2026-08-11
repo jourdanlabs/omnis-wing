@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Mapping, Optional
 
 REAL_WORK_POLICY_ID = "TERMINUS_REAL_WORK_V1"
 
-DELIVERY_MODE = frozenset({"RAW", "TRANSFORMED", "LOCAL_ONLY"})
+DELIVERY_MODE = frozenset({"RAW", "TRANSFORMED", "LOCAL_ONLY", "RUN_LOCAL"})
 RESPONSE_HANDLING = frozenset(
     {"CLEAN", "REDACTED", "SUPPRESSED", "REINTEGRATION_REFUSED", "NOT_APPLICABLE"}
 )
@@ -23,10 +23,12 @@ RESPONSE_HANDLING = frozenset(
 ROUTE_TABLE: Mapping[str, str] = {
     "caduceus.chat_completions": "GOVERNED",  # when terminus_real_work_v1 present
     "caduceus.omnis_broker_chat": "GOVERNED",  # P2 path; compose when section present
+    "caduceus.run_local": "GOVERNED",  # TERMINUS_RUN_LOCAL_V1 — CADUCEUS owns loopback socket
     "caduceus.image_generations": "DISABLED",  # real-work transform not wired
     "wing.chat_join": "GOVERNED",  # TransportBroker → CADUCEUS when configured
     "wing.chat_join_direct_provider": "DISABLED",  # no direct MiniMax on dogfood path
     "wing.image_join": "DISABLED",  # residual/history; not real-work vertical
+    "wing.run_local_direct": "DISABLED",  # never: WING must not open local model socket
     "wing.embeddings": "DISABLED",
     "wing.audio": "DISABLED",
     "wing.mcp": "DISABLED",
