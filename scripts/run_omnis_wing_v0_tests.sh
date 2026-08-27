@@ -22,4 +22,6 @@ exec "$PY" -m unittest \
   tests.omnis_wing.test_m1_m7_terminus \
   tests.omnis_wing.test_p0_m1_m7_hold_repair \
   tests.omnis_wing.test_full_cadmus_zt_matrix \
+  tests.omnis_wing.test_pan_identity \
+  tests.omnis_wing.test_chamber_memory \
   -v

@@ -1,0 +1,99 @@
+{
+  "ok": true,
+  "ts": "2026-08-26T23:08:54.993Z",
+  "plan": "WING V1 (OMNIS WING)",
+  "status": "complete",
+  "items": [
+    {
+      "id": "p0-tests",
+      "label": "v0 admission suite green",
+      "ok": true,
+      "note": "196 tests"
+    },
+    {
+      "id": "p0-build-script",
+      "label": "Build script (omnis-wing-build.mjs)",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p0-dry-run",
+      "label": "Path A cutover dry-run (no live hermes writes)",
+      "ok": true,
+      "note": "DRY_RUN_OK"
+    },
+    {
+      "id": "p1-signer-test",
+      "label": "Production signer health tests",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p2-pan-identity",
+      "label": "wing pan sealed soul identity",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p2-chamber-memory",
+      "label": "Chamber memory bridge tests",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p2-soul-not-in-repo",
+      "label": "Sealed soul text not copied into repo",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p3-hermes-wing",
+      "label": "Dogfood launcher scripts/hermes-wing",
+      "ok": true,
+      "note": "/Users/sokpyeon/projects/omnis-wing/scripts/hermes-wing"
+    },
+    {
+      "id": "p3-evidence-spine",
+      "label": "Evidence spine tests",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p3-live-hermes-untouched",
+      "label": "Live ~/.hermes/hermes-agent not modified by verify",
+      "ok": true,
+      "note": "2213ea9fa73ab06cf667c1bfb1e99c8de3541589"
+    },
+    {
+      "id": "p4-verify-plan",
+      "label": "WING V1 verify plan script present",
+      "ok": true,
+      "note": null
+    }
+  ],
+  "counts": {
+    "v0_tests": 196,
+    "pan_identity_tests": 11,
+    "chamber_memory_tests": 6
+  },
+  "pan_identity": {
+    "gate_ok": true,
+    "mts_package_present": true,
+    "souls_dir": "/Users/sokpyeon/projects/mts/souls"
+  },
+  "path_a": {
+    "dry_run_ok": true,
+    "hermes_wing": "/Users/sokpyeon/projects/omnis-wing/scripts/hermes-wing",
+    "live_agent": "/Users/sokpyeon/.hermes/hermes-agent",
+    "dry_run_skipped": false
+  },
+  "completion_clear": {
+    "pin": "b25eecbea7e0b45bcecc69d6ee8ce69ebe8f4399",
+    "baseline_v0_tests": 196
+  },
+  "manual": [
+    "Path C (replace live ~/.hermes/hermes-agent) forbidden without explicit Captain order",
+    "Keychain enroll is Captain-explicit only",
+    "Optional: wing pan chat smoke with provider keys"
+  ]
+}

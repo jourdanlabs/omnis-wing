@@ -117,6 +117,8 @@ from types import SimpleNamespace
 sys.path.insert(0, os.environ["WING_ROOT"])
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
 os.environ["OMNIS_WING_FORCE_CLASSIFICATION"] = "generic"
+from tests.omnis_wing._fixtures import bootstrap_wing_test_env
+bootstrap_wing_test_env()
 from agent.chat_completion_helpers import interruptible_api_call
 
 class C:
@@ -213,13 +215,18 @@ cat > "$LAUNCHER" << LAUNCH
 #!/usr/bin/env bash
 # Dogfood launcher — Path A. Does not replace live hermes.
 set -euo pipefail
-ROOT="$ROOT"
+ROOT="\$(cd "\$(dirname "\$0")/.." && pwd)"
+VENV_PY="\${OMNIS_WING_HERMES_PYTHON:-\$HOME/.hermes/hermes-agent/venv/bin/python}"
 export PYTHONPATH="\$ROOT\${PYTHONPATH:+:\$PYTHONPATH}"
 export HERMES_HOME="\${HERMES_HOME:-$DOGFOOD_HOME}"
 export OMNIS_WING_LEDGER_DIR="\${OMNIS_WING_LEDGER_DIR:-$LEDGER_DIR}"
 # Product default: no disposable signer. For labeled dogfood only:
 #   OMNIS_WING_SIGNER_MODE=test hermes-wing ...
-exec "$VENV_PY" "\$ROOT/cli.py" "\$@"
+if [[ ! -x "\$VENV_PY" ]]; then
+  echo "[hermes-wing] missing venv python: \$VENV_PY" >&2
+  exit 127
+fi
+exec "\$VENV_PY" "\$ROOT/cli.py" "\$@"
 LAUNCH
 chmod +x "$LAUNCHER"
 echo "wrote launcher $LAUNCHER"

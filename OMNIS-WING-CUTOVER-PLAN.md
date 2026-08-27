@@ -64,3 +64,13 @@ hermes-wing chat -q "hi"  # one-shot
 - Live `hermes` + `videl` profile unchanged
 - Default `OMNIS_WING_SIGNER_MODE=test` (dogfood). After Keychain enroll, run with `OMNIS_WING_SIGNER_MODE=` empty for production posture.
 - Smoke observed: `hermes-wing chat -Q -q ...` → `WINGOK`
+
+## Track B — `wing pan` (Cursor-polish, 2026-08-23)
+
+**Status:** built on branch `toph/real-work-contract-parity` — not CLEAR, not committed here.
+
+- **Command:** `./scripts/wing pan` (identity) · `./scripts/wing pan verify` · `./scripts/wing pan chat`
+- **Identity source:** MTS-sealed `soul_bb75a9fa2823` at `~/projects/mts/souls/` (override: `MTS_SOULS_DIR` / `OMNIS_SOULS_DIR`). Soul text is **not** copied into the repo; runtime loads + verifies bedrock/chain, then stages to `~/.hermes/profiles/pan-wing/SOUL.md` for chat.
+- **Refusal:** missing package or tampered bedrock → refuse (no Hermes bread fallback).
+- **Tests:** `tests/omnis_wing/test_pan_identity.py` (load + missing + tampered fixture + CLI path).
+- **Still open:** live LLM chat smoke under `wing pan chat` (needs provider keys); memory-bridge recall from chamber vault not wired yet.
