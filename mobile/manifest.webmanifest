@@ -1,0 +1,17 @@
+{
+  "name": "OMNIS WING Mobile",
+  "short_name": "WING",
+  "description": "Mobile health monitor for OMNIS WING Hermes transport",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#0b1f33",
+  "theme_color": "#38bdf8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

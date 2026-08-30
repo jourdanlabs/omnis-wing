@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1f33" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>OMNIS WING Mobile</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">OMNIS SUITE</p>
+      <h1>WING Mobile</h1>
+      <p class="sub">Hermes transport health — monitor desktop WING</p>
+    </header>
+
+    <section class="card">
+      <label for="health-cmd">Health probe command</label>
+      <input id="health-cmd" type="text" readonly value="python -m omnis_wing.operator_cli health" />
+      <p class="hint">Run on desktop; paste JSON output below for offline verify.</p>
+      <textarea id="health-json" rows="8" placeholder='Paste health JSON from operator_cli…'></textarea>
+      <button id="btn-parse" type="button">Parse health</button>
+      <p id="status" class="status">Awaiting health report</p>
+    </section>
+
+    <section class="card">
+      <h2>Summary</h2>
+      <dl id="summary" class="summary"></dl>
+    </section>
+
+    <script type="module" src="/app.mjs"></script>
+  </body>
+</html>

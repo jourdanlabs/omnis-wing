@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "ts": "2026-08-30T00:19:18.174Z",
+  "schema": "OmnisSurfaceVerifyReceiptV1",
+  "surface": "WING-MOBILE",
+  "repo": "/Users/sokpyeon/projects/omnis-wing",
+  "plan": "WING Mobile V1 — offline health paste shell for Hermes transport",
+  "status": "complete",
+  "items": [
+    {
+      "id": "p0-mobile-tests",
+      "label": "mobile-health.test.mjs exit 0",
+      "ok": true,
+      "note": "3 pass"
+    },
+    {
+      "id": "p0-build-script",
+      "label": "scripts/omnis-wing-build.mjs (parent WING)",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p1-health-parse",
+      "label": "health-parse.mjs — operator_cli JSON parser",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p1-pwa-manifest",
+      "label": "PWA manifest (standalone)",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p1-mobile-ui",
+      "label": "mobile/index.html — health paste + summary UI",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p2-offline-honest",
+      "label": "No fake live wire — paste-only health (honest gate)",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p2-operator-cli-doc",
+      "label": "Documents operator_cli health command",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p3-parent-wing",
+      "label": "Parent omnis_wing.operator_cli exists",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p4-probe-script",
+      "label": "scripts/omnis-wing-mobile-probe.mjs",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p4-probe-exit-0",
+      "label": "omnis-wing-mobile-probe exits 0",
+      "ok": true,
+      "note": null
+    },
+    {
+      "id": "p4-verify-plan",
+      "label": "omnis-wing-mobile-verify-plan.mjs → WING-MOBILE-V1-PLAN.json",
+      "ok": true,
+      "note": null
+    }
+  ],
+  "manual": [
+    "Desktop: python -m omnis_wing.operator_cli health --ledger <path>",
+    "Paste JSON into mobile shell — no live fetch (honest offline gate)",
+    "Serve: python -m http.server 8877 --directory mobile"
+  ]
+}
