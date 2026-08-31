@@ -30,10 +30,11 @@ def test_corpus_digest_stable_shape():
     assert all(c in "0123456789abcdef" for c in d)
 
 
-def test_route_table_does_not_claim_unwired_wing_chat():
-    assert ROUTE_TABLE["wing.chat_join"] == "DISABLED"
+def test_route_table_honest_primary_governed():
+    assert ROUTE_TABLE["wing.chat_join"] == "GOVERNED"
+    assert ROUTE_TABLE["wing.chat_join_direct_provider"] == "DISABLED"
     assert ROUTE_TABLE["caduceus.image_generations"] == "DISABLED"
-    assert_route_honest("wing.chat_join", "DISABLED")
+    assert_route_honest("wing.chat_join", "GOVERNED")
 
 
 def test_cannot_silently_upgrade_disabled_route():

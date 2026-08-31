@@ -205,31 +205,41 @@ if [[ -d "$LIVE_AGENT/.git" ]]; then
   echo "LIVE_HERMES_UNTOUCHED_OK"
 fi
 
-# 8) write dogfood launcher (does not replace ~/.local/bin/hermes)
+# 8) CADUCEUS dogfood launcher is canonical (from wing-public-release-prep).
+#    This dry-run must not rewrite scripts/hermes-wing.
 LAUNCHER="$ROOT/scripts/hermes-wing"
-VENV_PY="$LIVE_AGENT/venv/bin/python"
-if [[ ! -x "$VENV_PY" ]]; then
-  VENV_PY="$PY"
+if [[ ! -x "$LAUNCHER" ]]; then
+  echo "FAIL: missing CADUCEUS dogfood launcher $LAUNCHER" >&2
+  exit 1
 fi
-cat > "$LAUNCHER" << LAUNCH
-#!/usr/bin/env bash
-# Dogfood launcher — Path A. Does not replace live hermes.
-set -euo pipefail
-ROOT="\$(cd "\$(dirname "\$0")/.." && pwd)"
-VENV_PY="\${OMNIS_WING_HERMES_PYTHON:-\$HOME/.hermes/hermes-agent/venv/bin/python}"
-export PYTHONPATH="\$ROOT\${PYTHONPATH:+:\$PYTHONPATH}"
-export HERMES_HOME="\${HERMES_HOME:-$DOGFOOD_HOME}"
-export OMNIS_WING_LEDGER_DIR="\${OMNIS_WING_LEDGER_DIR:-$LEDGER_DIR}"
-# Product default: no disposable signer. For labeled dogfood only:
-#   OMNIS_WING_SIGNER_MODE=test hermes-wing ...
-if [[ ! -x "\$VENV_PY" ]]; then
-  echo "[hermes-wing] missing venv python: \$VENV_PY" >&2
-  exit 127
+echo "CADUCEUS_LAUNCHER_PRESENT $LAUNCHER"
+
+# 9) optional real-work preflight when production configs are provided
+if [[ -n "${OMNIS_WING_PRODUCTION_CONFIG:-}" && -n "${OMNIS_WING_REAL_WORK_CONFIG:-}" ]]; then
+  echo "== CADUCEUS real-work preflight =="
+  RW_PY="${OMNIS_WING_VENV_PY:-$LIVE_AGENT/venv/bin/python}"
+  if [[ ! -x "$RW_PY" ]]; then RW_PY="$RUNTIME_PY"; fi
+  export OMNIS_WING_SIGNER_MODE=production
+  "$RW_PY" - <<'PY'
+from pathlib import Path
+from omnis_wing.absolute.broker_guard import (
+    assert_no_agent_governed_bypass,
+    assert_real_work_local_transport_only,
+)
+from omnis_wing.absolute.real_work.admission import assert_contract_not_drifted
+
+root = Path.cwd().resolve()
+assert_contract_not_drifted()
+assert_no_agent_governed_bypass(root)
+assert_real_work_local_transport_only(root)
+print("WING_SOURCE_GUARDS_OK")
+PY
+  "$RW_PY" -m omnis_wing.absolute.real_work.launcher ensure >/dev/null
+  "$RW_PY" -m omnis_wing.absolute.real_work.launcher preflight >/dev/null
+  echo "WING_DOGFOOD_PREFLIGHT_OK"
+else
+  echo "CADUCEUS_PREFLIGHT_SKIPPED (set OMNIS_WING_PRODUCTION_CONFIG and OMNIS_WING_REAL_WORK_CONFIG to run)"
 fi
-exec "\$VENV_PY" "\$ROOT/cli.py" "\$@"
-LAUNCH
-chmod +x "$LAUNCHER"
-echo "wrote launcher $LAUNCHER"
 
 echo ""
 echo "DRY_RUN_OK path=A root=$ROOT dogfood=$DOGFOOD_HOME"

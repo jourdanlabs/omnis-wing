@@ -1,0 +1,20 @@
+{
+  "policy_id": "TERMINUS_REAL_WORK_V1",
+  "caduceus_base": "http://127.0.0.1:8791",
+  "caduceus_instance_id": "replace-with-operator-minted-instance-id",
+  "caduceus_root": "/absolute/path/to/clean-caduceus-6fe2d1f0-worktree",
+  "caduceus_commit": "6fe2d1f014bf6da7b3fb99a3c0145a3d9f4576b9",
+  "service_token_env": "CADUCEUS_SERVICE_TOKEN",
+  "timeout_seconds": 180,
+  "target": {
+    "provider": "minimax",
+    "scheme": "https",
+    "hostname": "api.minimax.io",
+    "port": 443,
+    "path": "/v1/chat/completions",
+    "model": "MiniMax-M3",
+    "residency": "CN",
+    "api_shape": "openai_chat_completions",
+    "lane": "codegen"
+  }
+}

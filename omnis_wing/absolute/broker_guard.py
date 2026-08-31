@@ -42,6 +42,7 @@ ALLOWED_GOVERNED_MODULES = frozenset(
         "omnis_wing.absolute.universal_egress",
         "omnis_wing.absolute.image_join",
         "omnis_wing.absolute.broker_guard",
+        "omnis_wing.absolute.real_work.caduceus_client",
     }
 )
 
@@ -52,6 +53,7 @@ ALLOWED_PATH_PREFIXES = (
     "omnis_wing/absolute/universal_egress.py",
     "omnis_wing/absolute/image_join.py",
     "omnis_wing/absolute/broker_guard.py",
+    "omnis_wing/absolute/real_work/",
     "tests/",  # tests may instrument / assert
     "omnis_wing/spec/",
     "omnis_wing/completion/route_manifest.json",
@@ -98,6 +100,22 @@ _DYNAMIC_IMPORT_FUNCS = frozenset(
         "reload",
     }
 )
+
+_NETWORK_MODULES = frozenset(
+    {
+        "socket",
+        "http.client",
+        "urllib.request",
+        "requests",
+        "httpx",
+        "aiohttp",
+        "openai",
+        "anthropic",
+        "boto3",
+        "botocore",
+    }
+)
+_REAL_WORK_LOCAL_TRANSPORT = "omnis_wing/absolute/real_work/caduceus_client.py"
 
 
 class BrokerViolation(RuntimeError):
@@ -512,3 +530,58 @@ def assert_no_agent_governed_bypass(root: Path) -> None:
     if uniq:
         detail = "; ".join(f"{p}:{n}:{s}" for p, n, s in uniq[:20])
         raise BrokerViolation(f"agent_governed_bypass:{len(uniq)}:{detail}")
+
+
+def assert_real_work_local_transport_only(root: Path) -> None:
+    """Only the exact loopback CADUCEUS client may own a network import.
+
+    This is an import-property guard, independent of names/call-site regexes:
+    aliases, re-exports and small wrappers still require importing (or
+    dynamically naming) a transport module somewhere in the real-work tree.
+    """
+
+    base = root / "omnis_wing" / "absolute" / "real_work"
+    hits: list[tuple[str, int, str]] = []
+    for path in base.glob("*.py"):
+        if not path.is_file():
+            continue
+        rel = str(path.relative_to(root)).replace("\\", "/")
+        if rel == _REAL_WORK_LOCAL_TRANSPORT:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
+        except (OSError, SyntaxError) as exc:
+            hits.append((rel, 0, f"unparseable:{type(exc).__name__}"))
+            continue
+        uses_dynamic_import = any(
+            (
+                isinstance(node, ast.Import)
+                and any(alias.name == "importlib" for alias in node.names)
+            )
+            or (
+                isinstance(node, ast.Call)
+                and _call_func_name(node) in ("import_module", "__import__")
+            )
+            for node in ast.walk(tree)
+        )
+        if uses_dynamic_import:
+            constants = _collect_string_constants(tree)
+            for target in _NETWORK_MODULES:
+                if _can_assemble_banned(constants, target):
+                    hits.append((rel, 0, f"dynamic_network_assembly:{target}"))
+        for node in ast.walk(tree):
+            names: list[str] = []
+            if isinstance(node, ast.Import):
+                names.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                names.append(node.module or "")
+            for name in names:
+                if any(name == banned or name.startswith(banned + ".") for banned in _NETWORK_MODULES):
+                    hits.append((rel, getattr(node, "lineno", 0), f"network_import:{name}"))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                value = node.value
+                if any(value == banned or value.startswith(banned + ".") for banned in _NETWORK_MODULES):
+                    hits.append((rel, getattr(node, "lineno", 0), f"dynamic_network_name:{value}"))
+    if hits:
+        detail = "; ".join(f"{p}:{n}:{s}" for p, n, s in sorted(set(hits))[:20])
+        raise BrokerViolation(f"real_work_transport_bypass:{len(set(hits))}:{detail}")

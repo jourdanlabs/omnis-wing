@@ -498,7 +498,8 @@ class FullCadmusZT(unittest.TestCase):
         )
         self.assertEqual(g["color"], "RED")
 
-    # ZT15 outside boundary named
+    # ZT15 workstation limits remain named in glass, while the dogfood AI
+    # route manifest itself has only explicit GOVERNED/DISABLED states.
     def test_zt15_glass_names_outside(self):
         g = glass_state(
             signer_ready=True,
@@ -512,9 +513,7 @@ class FullCadmusZT(unittest.TestCase):
         for x in ("IDE", "terminal", "browser", "git"):
             self.assertIn(x, g["outside_boundary"])
         man = load_manifest()
-        outside = [r for r in man["routes"] if r["state"] == "OUTSIDE_BOUNDARY"]
-        self.assertTrue(outside)
-        self.assertTrue(outside[0].get("outside_reason"))
+        self.assertFalse(any(r["state"] == "OUTSIDE_BOUNDARY" for r in man["routes"]))
 
     # ZT16 transport sweep runs
     def test_zt16_transport_sweep_callable(self):
@@ -550,15 +549,15 @@ class FullCadmusZT(unittest.TestCase):
             )
 
     # Manifest integrity post residual
-    def test_manifest_states_and_image_governed(self):
+    def test_manifest_states_and_real_work_scope(self):
         man = load_manifest()
         states = {r["route_id"]: r["state"] for r in man["routes"]}
-        self.assertEqual(states.get("wing.image.governed"), "GOVERNED")
-        self.assertEqual(states.get("gateway.platform_messaging"), "OUTSIDE_BOUNDARY")
+        self.assertEqual(states.get("wing.image.governed"), "DISABLED")
+        self.assertEqual(states.get("gateway.platform_messaging"), "DISABLED")
         for r in man["routes"]:
-            self.assertIn(r["state"], ("GOVERNED", "DISABLED", "OUTSIDE_BOUNDARY"))
+            self.assertIn(r["state"], ("GOVERNED", "DISABLED"))
 
-    def test_preflight_accepts_outside_boundary(self):
+    def test_preflight_accepts_closed_dogfood_route_grammar(self):
         r = run_preflight()
         self.assertTrue(r.ok, r.errors)
         self.assertFalse(any("route_bad_state" in e for e in r.errors))

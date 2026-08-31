@@ -117,7 +117,7 @@ class CompletionRouteTests(unittest.TestCase):
     def test_01_manifest_no_forbidden_states(self):
         man = load_manifest()
         for r in man["routes"]:
-            self.assertIn(r["state"], ("GOVERNED", "DISABLED", "OUTSIDE_BOUNDARY"))
+            self.assertIn(r["state"], ("GOVERNED", "DISABLED"))
             self.assertNotIn(r["state"].lower(), ("outside", "later"))
         self.assertGreaterEqual(man["summary"]["GOVERNED"], 1)
         self.assertGreaterEqual(man["summary"]["DISABLED"], 1)

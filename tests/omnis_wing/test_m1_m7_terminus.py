@@ -199,7 +199,7 @@ class M2BrokerTests(unittest.TestCase):
     def test_m2_manifest_states(self):
         man = load_manifest()
         for r in man["routes"]:
-            self.assertIn(r["state"], ("GOVERNED", "DISABLED", "OUTSIDE_BOUNDARY"))
+            self.assertIn(r["state"], ("GOVERNED", "DISABLED"))
 
     def test_m2_broker_chat(self):
         client = FakeClient()

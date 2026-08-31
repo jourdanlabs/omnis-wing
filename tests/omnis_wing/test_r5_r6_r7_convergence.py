@@ -398,7 +398,7 @@ class R7CoverageAdversarialTests(unittest.TestCase):
     def test_r7_manifest_exhaustive_states(self):
         man = load_manifest()
         for r in man["routes"]:
-            self.assertIn(r["state"], ("GOVERNED", "DISABLED", "OUTSIDE_BOUNDARY"), r["route_id"])
+            self.assertIn(r["state"], ("GOVERNED", "DISABLED"), r["route_id"])
         # primary paths present
         ids = {r["route_id"] for r in man["routes"]}
         for need in (

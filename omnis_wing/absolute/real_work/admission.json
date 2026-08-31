@@ -1,0 +1,27 @@
+{
+  "schema": "omnis-wing.real-work-admission.v1",
+  "wing_base": "b5bba23a5746aab9a217c4638d67260ccecaa6f4",
+  "caduceus": {
+    "commit": "6fe2d1f014bf6da7b3fb99a3c0145a3d9f4576b9",
+    "live_path_ancestor_commit": "05c7af0d3e49c73552cd446f3d1884ad40ae40b1",
+    "omnis_context_sha256": "a75f2f8aaf4187b64914a303d7bf1259c88b04a4f736d314949200c7b3338937",
+    "omnis_broker_sha256": "f6cfcd63243a38246277831827271e22e912c25c0bdbf078369ae5a5b10fd465",
+    "lockfile_sha256": "bd118b593c88820cd70914732a096e1902d3d2efea9d3e399814ac4e29da3a02",
+    "dependency_tree_sha256": "ba3df4fe8e75eebe283544eaaecd1a0f902bc7c35246b9816b367ab4ea0cd2f5",
+    "assembly_command": "npm ci --ignore-scripts",
+    "live_manifest_canonical_sha256": "183d1651caba906ea270066e69ffca501a2a74f56a29cfda77815cf0d6b938bb",
+    "live_manifest_raw_sha256": "5a6cb43dc844101923ee912382dccd1da9299c9f1947e3416bb3abbea29a0021",
+    "live_receipt_chain_sha256": "ad50c81cd4d54b12fc991cbbb938fdec14de3f4a20275bda6792eb8770f3dae5"
+  },
+  "terminus_contract": {
+    "commit": "80874fd1d326facc6ae6af0416de35f9bdef0a33"
+  },
+  "ide_contract": {
+    "commit": "b72876528abafb7b0dd54bac4f7b1a7bce75accd",
+    "broker_sha256": "1ad5a9178daef5e6b5a98e3aef1e76cc4f52ec594e872b3d2c9e22d62970b5bf",
+    "local_context_sha256": "d7d2c43e21b72011f2bbb7f2f0f13515c689b0b5e8e61883dd1279c930a404ee"
+  },
+  "wing_contract_sha256": "92b2747bdae7887f9bb44eb6c24b7a352269c995f6f10dda17b41227fe226172",
+  "wing_corpus_sha256": "bd1c2f46646a9a6554c05a575cbd7f0eb58ac8c894ca61a1913a23924cdfeb00",
+  "policy_id": "TERMINUS_REAL_WORK_V1"
+}

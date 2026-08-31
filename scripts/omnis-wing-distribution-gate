@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# OMNIS WING product distribution gate.
+# Builds wheel/sdist, installs into a disposable venv, freezes operator bundle,
+# closed routes, and optional external loopback matrix. Never live provider.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+PY="${OMNIS_WING_VENV_PY:-}"
+if [[ -z "$PY" ]]; then
+  if command -v python3.11 >/dev/null 2>&1; then PY=python3.11
+  else PY=python3
+  fi
+fi
+CADUCEUS_ROOT="${OMNIS_WING_CADUCEUS_ROOT:-}"
+OUT="${OMNIS_WING_DIST_OUT:-$ROOT/.omnis-wing-build/distribution-gate}"
+ARGS=(gate --source-root "$ROOT" --out "$OUT")
+if [[ -n "$CADUCEUS_ROOT" ]]; then
+  ARGS+=(--caduceus-root "$CADUCEUS_ROOT")
+fi
+if [[ "${OMNIS_WING_DIST_SKIP_MATRIX:-}" == "1" ]]; then
+  ARGS+=(--skip-matrix)
+fi
+exec "$PY" -m omnis_wing.distribution.cli "${ARGS[@]}" "$@"

@@ -12,12 +12,12 @@
       "route_id": "agent.interruptible.chat_completions.non_stream",
       "source": "agent/chat_completion_helpers.py:interruptible_api_call",
       "modality": "chat",
-      "client": "openai_compatible",
+      "client": "local_caduceus_authenticated_loopback",
       "broker_join": "omnis_wing.absolute.transport_broker.TransportBroker.transmit_chat_completions",
-      "destination": "client.base_url+HOSTNAME_POLICY",
-      "provenance": "auto_workspace",
-      "receipt": "EvidenceLedger",
-      "test": "tests.omnis_wing.test_r2_chat_path+test_r3+test_r4",
+      "destination": "operator-bound loopback CADUCEUS; CADUCEUS owns provider destination",
+      "provenance": "request-scoped final-message+source manifest",
+      "receipt": "WING EvidenceLedger + correlated CADUCEUS receipt/verified chain",
+      "test": "tests.omnis_wing.test_wing_caduceus_real_work",
       "state": "GOVERNED"
     },
     {
@@ -30,7 +30,8 @@
       "provenance": "auto_workspace",
       "receipt": "EvidenceLedger",
       "test": "tests.omnis_wing.test_completion_routes",
-      "state": "GOVERNED"
+      "state": "DISABLED",
+      "disable_reason": "Real-work dogfood supports primary CADUCEUS chat only"
     },
     {
       "route_id": "agent.interruptible.bedrock_converse.non_stream",
@@ -42,7 +43,8 @@
       "provenance": "auto_workspace",
       "receipt": "EvidenceLedger",
       "test": "tests.omnis_wing.test_completion_routes",
-      "state": "GOVERNED"
+      "state": "DISABLED",
+      "disable_reason": "Real-work dogfood supports primary CADUCEUS chat only"
     },
     {
       "route_id": "agent.interruptible.codex_responses.non_stream",
@@ -54,18 +56,19 @@
       "provenance": "auto_workspace",
       "receipt": "EvidenceLedger",
       "test": "tests.omnis_wing.test_completion_routes",
-      "state": "GOVERNED"
+      "state": "DISABLED",
+      "disable_reason": "Real-work dogfood supports primary CADUCEUS chat only"
     },
     {
       "route_id": "agent.interruptible_streaming.chat_completions",
       "source": "agent/chat_completion_helpers.py:interruptible_streaming_api_call",
       "modality": "chat_stream",
-      "client": "openai_compatible",
+      "client": "local_caduceus_authenticated_loopback",
       "broker_join": "omnis_wing.absolute.transport_broker.TransportBroker.transmit_streaming",
-      "destination": "client.base_url",
+      "destination": "buffered after CADUCEUS non-stream response gate",
       "provenance": "auto_workspace",
       "receipt": "EvidenceLedger",
-      "test": "tests.omnis_wing.test_completion_routes",
+      "test": "tests.omnis_wing.test_wing_caduceus_real_work",
       "state": "GOVERNED"
     },
     {
@@ -78,7 +81,8 @@
       "provenance": "auto_workspace",
       "receipt": "EvidenceLedger",
       "test": "tests.omnis_wing.test_completion_routes",
-      "state": "GOVERNED"
+      "state": "DISABLED",
+      "disable_reason": "Real-work dogfood folds only OpenAI-compatible primary stream through CADUCEUS"
     },
     {
       "route_id": "agent.interruptible_streaming.anthropic",
@@ -90,7 +94,8 @@
       "provenance": "auto_workspace",
       "receipt": "EvidenceLedger",
       "test": "tests.omnis_wing.test_completion_routes",
-      "state": "GOVERNED"
+      "state": "DISABLED",
+      "disable_reason": "Real-work dogfood folds only OpenAI-compatible primary stream through CADUCEUS"
     },
     {
       "route_id": "agent.iteration_limit_summary",
@@ -114,7 +119,8 @@
       "provenance": "auto_workspace",
       "receipt": "EvidenceLedger",
       "test": "tests.omnis_wing.test_completion_routes",
-      "state": "GOVERNED"
+      "state": "DISABLED",
+      "disable_reason": "Real-work dogfood supports primary CADUCEUS chat only"
     },
     {
       "route_id": "agent.auxiliary_client.chat_completions",
@@ -133,14 +139,14 @@
       "route_id": "wing.image.governed",
       "source": "omnis_wing/absolute/image_join.py:governed_image_transmit",
       "modality": "image",
-      "client": "openai_compatible_image",
-      "broker_join": "omnis_wing.absolute.transport_broker.TransportBroker.transmit_image",
-      "destination": "client.base_url+HOSTNAME_POLICY",
-      "provenance": "body_taint",
-      "receipt": "EvidenceLedger",
-      "test": "tests.omnis_wing.test_full_cadmus_zt_matrix",
-      "state": "GOVERNED",
-      "notes": "Matrix GOVERNED image door; product tools.vision_tools remains DISABLED until it calls this join"
+      "client": "disabled",
+      "broker_join": "omnis_wing.absolute.transport_broker.TransportBroker.transmit_image→hard_refuse",
+      "destination": "n/a",
+      "provenance": "n/a",
+      "receipt": "n/a",
+      "test": "tests.omnis_wing.test_wing_caduceus_real_work",
+      "state": "DISABLED",
+      "disable_reason": "TERMINUS_REAL_WORK_V1 image transformation is not wired"
     },
     {
       "route_id": "tools.vision_tools",
@@ -295,26 +301,25 @@
       "provenance": "n/a",
       "receipt": "n/a",
       "test": "manifest_named",
-      "state": "OUTSIDE_BOUNDARY",
-      "outside_reason": "Not model-bound user→provider AI egress; messaging platforms remain outside WING AI transmission claim and are not silent AI bypasses"
+      "state": "DISABLED",
+      "disable_reason": "Dogfood launcher is isolated primary chat; messaging gateway launch is refused"
     },
     {
       "route_id": "health.provider_probe_no_user_payload",
       "source": "hermes_cli/doctor.py+status.py",
       "modality": "health_probe",
       "client": "httpx",
-      "broker_join": "N/A_NAMED_PROBE",
-      "destination": "provider health endpoints",
+      "broker_join": "dogfood_launcher_local_health_only",
+      "destination": "n/a",
       "provenance": "none_by_design",
       "receipt": "n/a",
-      "test": "manifest_named",
-      "state": "GOVERNED",
-      "notes": "Named health probes without user/workspace payload; must not carry workspace content"
+      "test": "tests.omnis_wing.test_wing_caduceus_real_work",
+      "state": "DISABLED",
+      "disable_reason": "Provider health probes are disabled; local CADUCEUS health is used instead"
     }
   ],
   "summary": {
-    "GOVERNED": 11,
-    "DISABLED": 12,
-    "OUTSIDE_BOUNDARY": 1
+    "GOVERNED": 3,
+    "DISABLED": 21
   }
 }

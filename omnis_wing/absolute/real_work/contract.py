@@ -19,15 +19,25 @@ RESPONSE_HANDLING = frozenset(
 )
 
 # Honest route table for this vertical. Update only when a path is actually joined.
+# Primary ordinary chat becomes GOVERNED via CADUCEUS join (not direct MiniMax).
 ROUTE_TABLE: Mapping[str, str] = {
     "caduceus.chat_completions": "GOVERNED",  # when terminus_real_work_v1 present
     "caduceus.omnis_broker_chat": "GOVERNED",  # P2 path; compose when section present
     "caduceus.image_generations": "DISABLED",  # real-work transform not wired
-    "wing.chat_join": "DISABLED",  # not yet corpus-equivalent on TRANSFORMED
+    "wing.chat_join": "GOVERNED",  # TransportBroker → CADUCEUS when configured
+    "wing.chat_join_direct_provider": "DISABLED",  # no direct MiniMax on dogfood path
     "wing.image_join": "DISABLED",  # residual/history; not real-work vertical
     "wing.embeddings": "DISABLED",
     "wing.audio": "DISABLED",
     "wing.mcp": "DISABLED",
+    "wing.stream": "GOVERNED",  # buffered only after CADUCEUS response gate
+    "wing.anthropic": "DISABLED",
+    "wing.bedrock": "DISABLED",
+    "wing.codex": "DISABLED",
+    "wing.vision": "DISABLED",
+    "wing.transcription": "DISABLED",
+    "wing.moa": "DISABLED",
+    "wing.auxiliary": "DISABLED",
 }
 
 _CORPUS_PATH = Path(__file__).with_name("terminus-transform-v1.corpus.json")

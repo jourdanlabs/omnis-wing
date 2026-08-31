@@ -24,4 +24,6 @@ exec "$PY" -m unittest \
   tests.omnis_wing.test_full_cadmus_zt_matrix \
   tests.omnis_wing.test_pan_identity \
   tests.omnis_wing.test_chamber_memory \
+  tests.omnis_wing.test_wing_caduceus_real_work \
+  tests.omnis_wing.test_operator_runbook \
   -v

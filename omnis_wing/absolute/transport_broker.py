@@ -43,11 +43,25 @@ class TransportBroker:
 
     _instance_id: str = "wing-transport-broker-v1"
 
-    def transmit_chat_completions(self, client: Any, api_kwargs: dict, wing_ctx: Any) -> Any:
+    def transmit_chat_completions(
+        self, client: Any, api_kwargs: dict, wing_ctx: Any, *, agent: Any = None
+    ) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add("chat_completions")
-        # Stack frame of this method is the sole runtime authority for
-        # require_broker_dispatch inside the governed implementation.
+        from omnis_wing.absolute.real_work.runtime import real_work_required
+
+        if real_work_required():
+            from omnis_wing.absolute.real_work.runtime import transmit_primary_chat
+            from omnis_wing.absolute.runtime_context import get_wing_agent
+
+            agent = agent or get_wing_agent()
+            if agent is None:
+                raise BrokerViolation("real_work_agent_context_missing")
+            # Stack frame remains TransportBroker.transmit_chat_completions —
+            # the sole runtime authority for require_broker_dispatch.
+            _REGISTERED_TRANSPORTS.add("caduceus_chat")
+            return transmit_primary_chat(agent=agent, api_kwargs=api_kwargs, wing_ctx=wing_ctx)
+        # Cold tests without real-work config: legacy in-process join.
         return governed_chat_completions_create(client, api_kwargs, wing_ctx)
 
     def transmit_callable(
@@ -63,6 +77,12 @@ class TransportBroker:
     ) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
+        from omnis_wing.absolute.real_work.runtime import real_work_required
+
+        if real_work_required():
+            from omnis_wing.absolute.real_work.runtime import refuse_non_primary_route
+
+            refuse_non_primary_route(agent, route_id)
         return governed_callable_transmit(
             agent=agent,
             body=body,
@@ -83,6 +103,17 @@ class TransportBroker:
     ) -> Any:
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
+        from omnis_wing.absolute.real_work.runtime import real_work_required
+
+        if real_work_required():
+            from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
+            from omnis_wing.absolute.real_work.runtime import transmit_primary_stream
+
+            return transmit_primary_stream(
+                agent=agent,
+                api_kwargs=api_kwargs,
+                wing_ctx=ensure_agent_wing_context(agent, api_kwargs),
+            )
         return governed_streaming_create(
             agent=agent, client=client, api_kwargs=api_kwargs, route_id=route_id
         )
@@ -105,6 +136,12 @@ class TransportBroker:
         """
         with _lock:
             _REGISTERED_TRANSPORTS.add(route_id)
+        from omnis_wing.absolute.real_work.runtime import real_work_required
+
+        if real_work_required():
+            from omnis_wing.absolute.real_work.runtime import refuse_non_primary_route
+
+            refuse_non_primary_route(agent, route_id)
         return governed_image_transmit(
             agent=agent,
             body=body,

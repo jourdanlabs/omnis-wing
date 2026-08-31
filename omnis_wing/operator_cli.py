@@ -130,6 +130,15 @@ def main(argv: list[str] | None = None) -> int:
             "key_id": adapter.key_id,
             "available": adapter.available(),
         }
+        try:
+            from omnis_wing.absolute.real_work.launcher import status as real_work_status
+
+            out["real_work"] = real_work_status()
+        except Exception as exc:
+            out["real_work"] = {
+                "state": "NOT_READY",
+                "reason": f"{type(exc).__name__}:{exc}",
+            }
         if adapter.available():
             try:
                 out["public_key_sha256"] = adapter.public_fingerprint()
@@ -156,6 +165,15 @@ def main(argv: list[str] | None = None) -> int:
             anchor_path=anchor,
             remote_anchor_configured=bool(args.anchor),
         )
+        try:
+            from omnis_wing.absolute.real_work.launcher import status as real_work_status
+
+            report["real_work"] = real_work_status()
+        except Exception as exc:
+            report["real_work"] = {
+                "state": "NOT_READY",
+                "reason": f"{type(exc).__name__}:{exc}",
+            }
         sys.stdout.write(health_to_json(report))
         return 0 if report.get("verifier") in ("OK", "NOT_READY", "DEGRADED_OUTCOME_UNKNOWN") else 1
 
