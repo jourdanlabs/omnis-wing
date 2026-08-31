@@ -534,6 +534,11 @@ def pytest_configure(config):  # noqa: D401 — pytest hook
         "(only for tests that genuinely need real os.kill / subprocess "
         "behaviour — e.g. PTY tests that signal their own child).",
     )
+    config.addinivalue_line(
+        "markers",
+        "terminus_live: call the real CADUCEUS terminus-authorize CLI "
+        "(default tests stub ALLOW so 17k tests do not spawn node).",
+    )
 
     # The pyproject addopts pin ``--timeout-method=signal`` relies on
     # ``signal.SIGALRM``, which does not exist on Windows — pytest-timeout
@@ -542,6 +547,27 @@ def pytest_configure(config):  # noqa: D401 — pytest hook
     # suite runs natively there (POSIX keeps the more reliable signal method).
     if sys.platform == "win32" and getattr(config.option, "timeout_method", None) == "signal":
         config.option.timeout_method = "thread"
+
+
+@pytest.fixture(autouse=True)
+def _terminus_action_allow(request, monkeypatch):
+    """Stub CADUCEUS authorizeAction to ALLOW unless a test opts into live CLI."""
+    if request.node.get_closest_marker("terminus_live"):
+        return
+
+    def _allow(**_kwargs):
+        return {
+            "verdict": "ALLOW",
+            "decision": "PERMIT",
+            "reason": "permit",
+            "receipt": {"sig": "test"},
+        }
+
+    monkeypatch.setattr(
+        "omnis_wing.terminus_action.authorize_action",
+        _allow,
+        raising=False,
+    )
 
 
 @pytest.fixture(autouse=True)

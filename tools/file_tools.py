@@ -1200,6 +1200,20 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
             "Refusing to write internal read_file status text as file content. "
             "Re-read the file or reconstruct the intended file contents before writing."
         )
+    from omnis_wing.terminus_action import authorize_action as _terminus_authorize
+    from omnis_wing.terminus_action import block_message as _terminus_block
+    _term = _terminus_authorize(
+        agent_id="wing",
+        kind="file_write",
+        payload=content,
+        session_id=str(task_id or "default"),
+    )
+    if _term.get("verdict") != "ALLOW":
+        return tool_error(_terminus_block(_term), status="blocked", terminus={
+            "verdict": _term.get("verdict"),
+            "decision": _term.get("decision"),
+            "reason": _term.get("reason"),
+        })
     try:
         # Resolve once for the registry lock + stale check.  Failures here
         # fall back to the legacy path — write proceeds, per-task staleness
@@ -1297,6 +1311,20 @@ def patch_tool(mode: str = "replace", path: str = None, old_string: str = None,
             cross_warning = _check_cross_profile_path(_p, task_id)
             if cross_warning:
                 return tool_error(cross_warning)
+    from omnis_wing.terminus_action import authorize_action as _terminus_authorize
+    from omnis_wing.terminus_action import block_message as _terminus_block
+    _term = _terminus_authorize(
+        agent_id="wing",
+        kind="file_edit",
+        payload=patch if mode == "patch" and patch else f"{old_string or ''}\n{new_string or ''}",
+        session_id=str(task_id or "default"),
+    )
+    if _term.get("verdict") != "ALLOW":
+        return tool_error(_terminus_block(_term), status="blocked", terminus={
+            "verdict": _term.get("verdict"),
+            "decision": _term.get("decision"),
+            "reason": _term.get("reason"),
+        })
     try:
         # Resolve paths for locking.  Ordered + deduplicated so concurrent
         # callers lock in the same order — prevents deadlock on overlapping

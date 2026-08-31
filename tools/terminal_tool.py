@@ -2081,6 +2081,48 @@ def terminal_tool(
                     "status": "error",
                 }, ensure_ascii=False)
 
+        # Canonical TERMINUS (CADUCEUS authorizeAction). Existing tirith /
+        # dangerous-command guards stay as defense-in-depth. force=True is
+        # the human override for HOLD only — REFUSE still blocks.
+        from omnis_wing.terminus_action import authorize_action as _terminus_authorize
+        from omnis_wing.terminus_action import block_message as _terminus_block
+
+        _term = _terminus_authorize(
+            agent_id="wing",
+            kind="shell",
+            payload=command,
+            session_id=str(effective_task_id or "default"),
+            human_override=bool(force),
+        )
+        if _term.get("verdict") == "REFUSE":
+            return json.dumps({
+                "output": "",
+                "exit_code": -1,
+                "error": _terminus_block(_term),
+                "status": "blocked",
+                "terminus": {
+                    "verdict": _term.get("verdict"),
+                    "decision": _term.get("decision"),
+                    "reason": _term.get("reason"),
+                },
+            }, ensure_ascii=False)
+        if _term.get("verdict") == "HOLD" and not force:
+            return json.dumps({
+                "output": "",
+                "exit_code": -1,
+                "error": _terminus_block(_term),
+                "status": "pending_approval",
+                "approval_pending": True,
+                "command": command,
+                "description": _terminus_block(_term),
+                "pattern_key": "terminus_action_hold",
+                "terminus": {
+                    "verdict": _term.get("verdict"),
+                    "decision": _term.get("decision"),
+                    "reason": _term.get("reason"),
+                },
+            }, ensure_ascii=False)
+
         # Pre-exec security checks (tirith + dangerous command detection)
         # Skip check if force=True (user has confirmed they want to run it)
         approval_note = None
