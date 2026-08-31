@@ -1202,10 +1202,17 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
         )
     from omnis_wing.terminus_action import authorize_action as _terminus_authorize
     from omnis_wing.terminus_action import block_message as _terminus_block
+    try:
+        _terminus_target = str(_resolve_path_for_task(path, task_id))
+    except Exception:
+        _terminus_target = path
+    _terminus_workspace = _authoritative_workspace_root(task_id)
     _term = _terminus_authorize(
         agent_id="wing",
         kind="file_write",
         payload=content,
+        target_path=_terminus_target,
+        workspace_root=_terminus_workspace,
         session_id=str(task_id or "default"),
     )
     if _term.get("verdict") != "ALLOW":
@@ -1313,18 +1320,27 @@ def patch_tool(mode: str = "replace", path: str = None, old_string: str = None,
                 return tool_error(cross_warning)
     from omnis_wing.terminus_action import authorize_action as _terminus_authorize
     from omnis_wing.terminus_action import block_message as _terminus_block
-    _term = _terminus_authorize(
-        agent_id="wing",
-        kind="file_edit",
-        payload=patch if mode == "patch" and patch else f"{old_string or ''}\n{new_string or ''}",
-        session_id=str(task_id or "default"),
-    )
-    if _term.get("verdict") != "ALLOW":
-        return tool_error(_terminus_block(_term), status="blocked", terminus={
-            "verdict": _term.get("verdict"),
-            "decision": _term.get("decision"),
-            "reason": _term.get("reason"),
-        })
+    _terminus_payload = patch if mode == "patch" and patch else f"{old_string or ''}\n{new_string or ''}"
+    _terminus_workspace = _authoritative_workspace_root(task_id)
+    for _terminus_path in _paths_to_check:
+        try:
+            _terminus_target = str(_resolve_path_for_task(_terminus_path, task_id))
+        except Exception:
+            _terminus_target = _terminus_path
+        _term = _terminus_authorize(
+            agent_id="wing",
+            kind="file_edit",
+            payload=_terminus_payload,
+            target_path=_terminus_target,
+            workspace_root=_terminus_workspace,
+            session_id=str(task_id or "default"),
+        )
+        if _term.get("verdict") != "ALLOW":
+            return tool_error(_terminus_block(_term), status="blocked", terminus={
+                "verdict": _term.get("verdict"),
+                "decision": _term.get("decision"),
+                "reason": _term.get("reason"),
+            })
     try:
         # Resolve paths for locking.  Ordered + deduplicated so concurrent
         # callers lock in the same order — prevents deadlock on overlapping

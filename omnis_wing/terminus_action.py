@@ -35,6 +35,9 @@ def authorize_action(
     payload: str,
     session_id: str = "",
     human_override: bool = False,
+    target_path: str | None = None,
+    workspace_root: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Call CADUCEUS authorizeAction via the language-agnostic CLI.
 
@@ -58,6 +61,12 @@ def authorize_action(
         "payload": payload,
         "session_id": session_id,
     }
+    if target_path:
+        action["target_path"] = target_path
+    if workspace_root:
+        action["workspace_root"] = workspace_root
+    if metadata:
+        action["metadata"] = metadata
     if human_override:
         action["human_override"] = True
 
