@@ -84,8 +84,10 @@ _WING_MODEL_WARNING = (
 #   NousResearch/Wing-3-Llama-3.1-70B, wing-4-405b, openrouter/hermes3:70b
 # Negative examples it must NOT match:
 #   wing-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
+# ``hermes3`` is the live OpenRouter slug for the same Nous 3/4 chat family.
+# Product rename does not change that model id.
 _NOUS_WING_NON_AGENTIC_RE = re.compile(
-    r"(?:^|[/:])wing[-_ ]?[34](?:[-_.:]|$)",
+    r"(?:^|[/:])(?:wing|hermes)[-_ ]?[34](?:[-_.:]|$)",
     re.IGNORECASE,
 )
 
