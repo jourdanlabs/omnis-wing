@@ -92,14 +92,15 @@ class TestCliSkinPromptIntegration:
 
 
 class TestCompactBannerSkinIntegration:
-    def test_default_compact_banner_keeps_legacy_nous_wing_branding(self):
+    def test_default_compact_banner_uses_omnis_wing_branding(self):
         set_active_skin("default")
 
         with patch("cli.shutil.get_terminal_size", return_value=SimpleNamespace(columns=90)), \
              patch.dict(_build_compact_banner.__globals__, {"format_banner_version_label": lambda: "OMNIS WING v0.1.0 (test)"}):
             banner = _build_compact_banner()
 
-        assert "NOUS WING" in banner
+        assert "OMNIS WING" in banner
+        assert "NOUS WING" not in banner
 
     def test_poseidon_compact_banner_uses_skin_branding_instead_of_nous_wing(self):
         set_active_skin("poseidon")

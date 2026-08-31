@@ -3023,29 +3023,23 @@ class ChatConsole:
         yield self
 
 # ASCII Art - OMNIS-WING logo (full width, single line - requires ~95 char terminal)
-WING_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
-[bold #FFD700]██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
-[#FFBF00]███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
-[#FFBF00]██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
-[#CD7F32]██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
-[#CD7F32]╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]"""
+WING_AGENT_LOGO = """[bold #7eb8f6] ██████╗ ███╗   ███╗███╗   ██╗██╗███████╗       ██╗    ██╗██╗███╗   ██╗ ██████╗ [/]
+[bold #7eb8f6]██╔═══██╗████╗ ████║████╗  ██║██║██╔════╝       ██║    ██║██║████╗  ██║██╔════╝ [/]
+[#8EA8FF]██║   ██║██╔████╔██║██╔██╗ ██║██║███████╗       ██║ █╗ ██║██║██╔██╗ ██║██║  ███╗[/]
+[#8EA8FF]██║   ██║██║╚██╔╝██║██║╚██╗██║██║╚════██║       ██║███╗██║██║██║╚██╗██║██║   ██║[/]
+[#4169e1]╚██████╔╝██║ ╚═╝ ██║██║ ╚████║██║███████║       ╚███╔███╔╝██║██║ ╚████║╚██████╔╝[/]
+[#4169e1] ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝╚══════╝        ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝ [/]"""
 
-# ASCII Art - WING Caduceus (compact, fits in left panel)
-WING_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀[/]
-[#FFBF00]⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
+# ASCII Art — wings (compact, fits in left panel)
+WING_CADUCEUS = """[#4169e1]████▄                ▄████[/]
+[#4169e1]█████▀              ▀█████[/]
+[#8EA8FF] ███▀    ▄██████▄    ▀███[/]
+[#8EA8FF]  █▀   ▄██▀    ▀██▄   ▀█[/]
+[#7eb8f6]      ██▀        ▀██[/]
+[#8EA8FF]     ██            ██[/]
+[#8EA8FF]      ▀██▄      ▄██▀[/]
+[#4169e1]        ▀██▄▄▄▄██▀[/]
+[#4b5563]           ▀▀▀▀[/]"""
 
 
 
@@ -3062,13 +3056,9 @@ def _build_compact_banner() -> str:
     title_color = _skin.get_color("banner_title", "#FFBF00") if _skin else "#FFBF00"
     dim_color = _skin.get_color("banner_dim", "#B8860B") if _skin else "#B8860B"
 
-    if skin_name == "default":
-        line1 = "⚕ NOUS WING - AI Agent Framework"
-        tiny_line = "⚕ NOUS WING"
-    else:
-        agent_name = _skin.get_branding("agent_name", "OMNIS WING") if _skin else "OMNIS WING"
-        line1 = f"{agent_name} - AI Agent Framework"
-        tiny_line = agent_name
+    agent_name = _skin.get_branding("agent_name", "OMNIS WING") if _skin else "OMNIS WING"
+    line1 = f"{agent_name}"
+    tiny_line = agent_name
 
     if os.environ.get("WING_FAST_STARTUP_BANNER") == "1":
         from wing_cli import __release_date__ as _release_date
@@ -3080,7 +3070,7 @@ def _build_compact_banner() -> str:
 
     w = min(shutil.get_terminal_size().columns - 2, 88)
     if w < 30:
-        return f"\n[{title_color}]{tiny_line}[/] [dim {dim_color}]- Nous Research[/]\n"
+        return f"\n[{title_color}]{tiny_line}[/] [dim {dim_color}]- JourdanLabs[/]\n"
 
     inner = w - 2  # inside the box border
     bar = "═" * w

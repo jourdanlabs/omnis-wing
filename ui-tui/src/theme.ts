@@ -238,10 +238,10 @@ function normalizeAnsiForeground(color: string): string {
 
 const BRAND: ThemeBrand = {
   name: 'OMNIS WING',
-  icon: '⚕',
+  icon: '✦',
   prompt: '❯',
   welcome: 'Type your message or /help for commands.',
-  goodbye: 'Goodbye! ⚕',
+  goodbye: 'Goodbye.',
   tool: '┊',
   helpHeader: '(^_^)? Commands'
 }
@@ -256,40 +256,32 @@ const cleanPromptSymbol = (s: string | undefined, fallback: string) => {
 
 export const DARK_THEME: Theme = {
   color: {
-    primary: '#FFD700',
-    accent: '#FFBF00',
-    border: '#CD7F32',
-    text: '#FFF8DC',
-    muted: '#CC9B1F',
-    // Bumped from the old `#B8860B` darkgoldenrod (~53% luminance) which
-    // read as barely-visible on dark terminals for long body text.  The
-    // new value sits ~60% luminance — readable without losing the "muted /
-    // secondary" semantic.  Field labels still use `label` (65%) which
-    // stays brighter so hierarchy holds.
-    completionBg: '#1a1a2e',
-    completionCurrentBg: '#333355',
-    completionMetaBg: '#1a1a2e',
-    completionMetaCurrentBg: '#333355',
+    primary: '#7eb8f6',
+    accent: '#8EA8FF',
+    border: '#4169e1',
+    text: '#c9d1d9',
+    muted: '#4b5563',
+    completionBg: '#151C2F',
+    completionCurrentBg: '#243056',
+    completionMetaBg: '#151C2F',
+    completionMetaCurrentBg: '#243056',
 
-    label: '#DAA520',
-    ok: '#4caf50',
-    error: '#ef5350',
-    warn: '#ffa726',
+    label: '#8EA8FF',
+    ok: '#63D0A6',
+    error: '#F7A072',
+    warn: '#e6a855',
 
-    prompt: '#FFF8DC',
-    // sessionLabel/sessionBorder intentionally track the `dim` value — they
-    // are "same role, same colour" by design.  fromSkin's banner_dim fallback
-    // relies on this pairing (#11300).
-    sessionLabel: '#CC9B1F',
-    sessionBorder: '#CC9B1F',
+    prompt: '#c9d1d9',
+    sessionLabel: '#4b5563',
+    sessionBorder: '#4b5563',
 
-    statusBg: '#1a1a2e',
-    statusFg: '#C0C0C0',
-    statusGood: '#8FBC8F',
-    statusWarn: '#FFD700',
-    statusBad: '#FF8C00',
-    statusCritical: '#FF6B6B',
-    selectionBg: '#3a3a55',
+    statusBg: '#151C2F',
+    statusFg: '#C9D1D9',
+    statusGood: '#63D0A6',
+    statusWarn: '#E6A855',
+    statusBad: '#F7A072',
+    statusCritical: '#FF7A7A',
+    selectionBg: '#243056',
 
     diffAdded: 'rgb(220,255,220)',
     diffRemoved: 'rgb(255,220,220)',
@@ -304,37 +296,37 @@ export const DARK_THEME: Theme = {
   bannerHero: ''
 }
 
-// Light-terminal palette: darker golds/ambers that stay legible on white
+// Light-terminal palette: darker blues that stay legible on white
 // backgrounds. Same shape as DARK_THEME so `fromSkin` still layers on top
 // cleanly (#11300).
 export const LIGHT_THEME: Theme = {
   color: {
-    primary: '#8B6914',
-    accent: '#A0651C',
-    border: '#7A4F1F',
-    text: '#3D2F13',
-    muted: '#7A5A0F',
-    completionBg: '#F5F5F5',
-    completionCurrentBg: mix('#F5F5F5', '#A0651C', 0.25),
-    completionMetaBg: '#F5F5F5',
-    completionMetaCurrentBg: mix('#F5F5F5', '#A0651C', 0.25),
+    primary: '#1D4ED8',
+    accent: '#2563EB',
+    border: '#2563EB',
+    text: '#111827',
+    muted: '#475569',
+    completionBg: '#F8FAFC',
+    completionCurrentBg: mix('#F8FAFC', '#2563EB', 0.25),
+    completionMetaBg: '#F8FAFC',
+    completionMetaCurrentBg: mix('#F8FAFC', '#2563EB', 0.25),
 
-    label: '#7A5A0F',
-    ok: '#2E7D32',
-    error: '#C62828',
-    warn: '#E65100',
+    label: '#1D4ED8',
+    ok: '#15803D',
+    error: '#B91C1C',
+    warn: '#B45309',
 
-    prompt: '#2B2014',
-    sessionLabel: '#7A5A0F',
-    sessionBorder: '#7A5A0F',
+    prompt: '#111827',
+    sessionLabel: '#1D4ED8',
+    sessionBorder: '#64748B',
 
-    statusBg: '#F5F5F5',
-    statusFg: '#333333',
-    statusGood: '#2E7D32',
-    statusWarn: '#8B6914',
-    statusBad: '#D84315',
-    statusCritical: '#B71C1C',
-    selectionBg: '#D4E4F7',
+    statusBg: '#E5EDF8',
+    statusFg: '#0F172A',
+    statusGood: '#15803D',
+    statusWarn: '#B45309',
+    statusBad: '#B91C1C',
+    statusCritical: '#7F1D1D',
+    selectionBg: '#DBEAFE',
 
     diffAdded: 'rgb(200,240,200)',
     diffRemoved: 'rgb(240,200,200)',
