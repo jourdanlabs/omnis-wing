@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from wing_constants import (
+    DEFAULT_INFERENCE_MODEL,
     get_wing_home,
     get_wing_home_override,
     reset_wing_home_override,
@@ -1524,7 +1525,7 @@ def _resolve_model() -> str:
         return str(m.get("default", "") or "").strip()
     if isinstance(m, str) and m:
         return m.strip()
-    return "anthropic/claude-sonnet-4"
+    return DEFAULT_INFERENCE_MODEL
 
 
 def _config_model_target() -> tuple[str, str]:

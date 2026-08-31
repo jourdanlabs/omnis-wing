@@ -4498,7 +4498,7 @@ def validate_config_structure(config: Optional[Dict[str, Any]] = None) -> List["
                 "Change to:\n"
                 "  fallback_model:\n"
                 "    provider: openrouter\n"
-                "    model: anthropic/claude-sonnet-4",
+                "    model: moonshotai/kimi-k2.6",
             ))
         elif fb:
             if not fb.get("provider"):
@@ -4511,7 +4511,7 @@ def validate_config_structure(config: Optional[Dict[str, Any]] = None) -> List["
                 issues.append(ConfigIssue(
                     "warning",
                     "fallback_model is missing 'model' field — fallback will be disabled",
-                    "Add: model: anthropic/claude-sonnet-4 (or another model)",
+                    "Add: model: moonshotai/kimi-k2.6 (or another model)",
                 ))
 
     # ── Check for fallback_model accidentally nested inside custom_providers ──
@@ -5831,7 +5831,7 @@ _FALLBACK_COMMENT = """
 #
 # fallback_model:
 #   provider: openrouter
-#   model: anthropic/claude-sonnet-4
+#   model: moonshotai/kimi-k2.6
 """
 
 
@@ -5863,7 +5863,7 @@ _COMMENTED_SECTIONS = """
 #
 # fallback_model:
 #   provider: openrouter
-#   model: anthropic/claude-sonnet-4
+#   model: moonshotai/kimi-k2.6
 """
 
 
@@ -6738,7 +6738,7 @@ def config_command(args):
             print("Usage: wing config set <key> <value>")
             print()
             print("Examples:")
-            print("  wing config set model anthropic/claude-sonnet-4")
+            print("  wing config set model moonshotai/kimi-k2.6")
             print("  wing config set terminal.backend docker")
             print("  wing config set OPENROUTER_API_KEY sk-or-...")
             sys.exit(1)

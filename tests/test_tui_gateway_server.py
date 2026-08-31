@@ -1284,6 +1284,19 @@ def test_status_callback_accepts_single_message_argument():
     )
 
 
+def test_resolve_model_fallback_is_non_anthropic(monkeypatch):
+    monkeypatch.delenv("WING_MODEL", raising=False)
+    monkeypatch.delenv("WING_INFERENCE_MODEL", raising=False)
+    monkeypatch.setattr(server, "_load_cfg", lambda: {})
+    from wing_constants import DEFAULT_INFERENCE_MODEL
+
+    resolved = server._resolve_model()
+    assert resolved == DEFAULT_INFERENCE_MODEL
+    assert "claude" not in resolved.lower()
+    assert "sonnet" not in resolved.lower()
+    assert "anthropic" not in resolved.lower()
+
+
 def test_resolve_model_uses_inference_model_env(monkeypatch):
     monkeypatch.delenv("WING_MODEL", raising=False)
     monkeypatch.setenv("WING_INFERENCE_MODEL", " anthropic/claude-sonnet-4.6\n")

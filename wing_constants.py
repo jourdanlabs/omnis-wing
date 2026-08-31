@@ -42,6 +42,11 @@ def get_wing_home_override() -> str | None:
     return str(override)
 
 
+# Shipped first-run / TUI fallback. Non-Anthropic. When CADUCEUS is
+# configured, the lane routes this via Fireworks US. Do not default to
+# claude-* — that slug is what landed in the David-facing frame.
+DEFAULT_INFERENCE_MODEL = "moonshotai/kimi-k2.6"
+
 # Pre-rename state dir. Named literally so an existing install is found.
 # Grep-gate exception: see NOTICE and docs/UPSTREAM-POLICY.md.
 _LEGACY_POSIX_STATE_DIRNAME = ".hermes"
