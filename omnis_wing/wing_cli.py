@@ -1,4 +1,4 @@
-"""WING operator CLI — `wing pan` loads sealed Pan, not Hermes bread."""
+"""WING operator CLI — `wing pan` loads sealed Pan, not WING bread."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from omnis_wing.sealed_soul import (
     SoulLoadRefused,
     default_souls_dir,
     load_pan_soul,
-    stage_pan_soul_for_hermes,
+    stage_pan_soul_for_wing,
     verify_sealed_soul,
 )
 
@@ -25,18 +25,18 @@ def _default_profile_home() -> Path:
     raw = os.environ.get("OMNIS_WING_PAN_PROFILE_HOME")
     if raw:
         return Path(raw).expanduser()
-    return Path.home() / ".hermes" / "profiles" / "pan-wing"
+    return Path.home() / ".omnis-wing" / "profiles" / "pan-wing"
 
 
 def _wing_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def _hermes_python() -> Path:
-    override = os.environ.get("OMNIS_WING_HERMES_PYTHON")
+def _wing_python() -> Path:
+    override = os.environ.get("OMNIS_WING_WING_PYTHON")
     if override:
         return Path(override).expanduser()
-    return Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "python"
+    return Path.home() / ".omnis-wing" / "omnis-wing" / "venv" / "bin" / "python"
 
 
 def cmd_pan_identity(args: argparse.Namespace) -> int:
@@ -104,31 +104,31 @@ def cmd_pan_chat(args: argparse.Namespace) -> int:
     profile_home = Path(args.profile_home).expanduser()
     souls_dir = Path(args.souls_dir) if args.souls_dir else None
     try:
-        loaded = stage_pan_soul_for_hermes(profile_home, souls_dir)
+        loaded = stage_pan_soul_for_wing(profile_home, souls_dir)
     except SoulLoadRefused as exc:
         print(REFUSAL_NOT_OPEN if exc.verification.verdict == "MISSING" else REFUSAL_VERIFY, file=sys.stderr)
         print(exc.verification.message, file=sys.stderr)
         return 2
 
-    py = _hermes_python()
+    py = _wing_python()
     if not py.is_file():
-        print(f"[wing pan] missing Hermes python: {py}", file=sys.stderr)
+        print(f"[wing pan] missing WING python: {py}", file=sys.stderr)
         return 127
 
     root = _wing_root()
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{root}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else str(root)
-    env["HERMES_HOME"] = str(profile_home)
+    env["WING_HOME"] = str(profile_home)
     env["OMNIS_WING_PAN_SOUL_ID"] = loaded.soul_id
     env["OMNIS_WING_PAN_SEALED_PATH"] = str(loaded.soul_path)
     if env.get("OMNIS_WING_QUIET_BANNER") != "1":
-        print(f"[wing pan] HERMES_HOME={profile_home}", file=sys.stderr)
+        print(f"[wing pan] WING_HOME={profile_home}", file=sys.stderr)
         print(f"[wing pan] sealed={loaded.soul_path}", file=sys.stderr)
         print(f"[wing pan] verdict={loaded.verification.verdict}", file=sys.stderr)
 
-    hermes_argv = [str(py), "-c", "import sys; from hermes_cli.main import main; sys.exit(main())", "chat"]
-    hermes_argv.extend(args.hermes_args)
-    return subprocess.call(hermes_argv, env=env)
+    wing_argv = [str(py), "-c", "import sys; from wing_cli.main import main; sys.exit(main())", "chat"]
+    wing_argv.extend(args.wing_args)
+    return subprocess.call(wing_argv, env=env)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -149,10 +149,10 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--souls-dir", default="")
     verify.set_defaults(handler=cmd_pan_verify)
 
-    chat = pan_sub.add_parser("chat", help="stage sealed Pan SOUL and launch Hermes chat")
+    chat = pan_sub.add_parser("chat", help="stage sealed Pan SOUL and launch WING chat")
     chat.add_argument("--profile-home", default=str(_default_profile_home()))
     chat.add_argument("--souls-dir", default="")
-    chat.add_argument("hermes_args", nargs=argparse.REMAINDER)
+    chat.add_argument("wing_args", nargs=argparse.REMAINDER)
     chat.set_defaults(handler=cmd_pan_chat)
 
     pan.set_defaults(handler=cmd_pan_identity, pan_cmd="identity")

@@ -1,4 +1,4 @@
-"""WING production-cutover leg: attach production signer; no live Keychain/Hermes."""
+"""WING production-cutover leg: attach production signer; no live Keychain/WING."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 _tmp = tempfile.mkdtemp(prefix="wing-prod-cut-")
-os.environ["HERMES_HOME"] = _tmp
+os.environ["WING_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "ledgers")
 os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
 os.environ.pop("OMNIS_WING_PRODUCTION_CONFIG", None)
@@ -49,7 +49,7 @@ for _n in ("requests", "yaml"):
         sys.modules[_n] = m
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.production_config import (  # noqa: E402
     ProductionConfigError,
     load_production_config,
@@ -69,7 +69,7 @@ from omnis_wing.absolute.receipt_spine import (  # noqa: E402
     UnavailableSigner,
     verify_signed_receipt,
 )
-from omnis_wing.absolute.hermes_chat_join import EvidenceSession  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import EvidenceSession  # noqa: E402
 
 US = "https://ai.example.test/v1"
 TEST_P256_TAG = "ai.jourdanlabs.omnis-wing.test.prodcutover.p256"
@@ -291,7 +291,7 @@ class ProductionCutoverTests(unittest.TestCase):
         agent = MiniAgent(client)
         attach_wing_runtime(agent, force=True)
 
-        from omnis_wing.absolute.hermes_chat_join import OutcomeUnknownError
+        from omnis_wing.absolute.wing_chat_join import OutcomeUnknownError
         from omnis_wing.absolute.receipt_spine import EvidenceLedger
 
         # Class-level inject — production re-attach replaces instance ledger
@@ -422,7 +422,7 @@ class ProductionCutoverTests(unittest.TestCase):
     def test_10_planted_test_session_production_refuse(self):
         """Planted ready test session + wing_runtime_attached in production => refuse."""
         from omnis_wing.absolute.receipt_spine import make_test_signer, EvidenceLedger
-        from omnis_wing.absolute.hermes_chat_join import EvidenceSession
+        from omnis_wing.absolute.wing_chat_join import EvidenceSession
 
         os.environ["OMNIS_WING_SIGNER_MODE"] = "production"
         # no production config

@@ -25,7 +25,7 @@ disabled=True
 
 ## Operational boundary (exact)
 
-- Clears the **OMNIS WING fork**, not live `~/.hermes/hermes-agent`.
+- Clears the **OMNIS WING fork**, not live `~/.omnis-wing/omnis-wing`.
 - Live cutover/install is a **separately authorized** gate — deployment, not more completion feature work.
 - No package, push, live provider call, or Keychain mutation by this gate.
 

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# wing — OMNIS WING operator launcher (Track B: sealed soul seats).
+# Does NOT replace live wing. `wing pan` loads MTS-sealed Pan, not WING bread.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VENV_PY="${OMNIS_WING_WING_PYTHON:-$HOME/.omnis-wing/omnis-wing/venv/bin/python}"
+
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+
+if [[ ! -x "$VENV_PY" ]]; then
+  echo "[wing] missing python: $VENV_PY" >&2
+  exit 127
+fi
+
+exec "$VENV_PY" -m omnis_wing.wing_cli "$@"

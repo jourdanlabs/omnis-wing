@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 _tmp = tempfile.mkdtemp(prefix="wing-p0hold-")
-os.environ["HERMES_HOME"] = _tmp
+os.environ["WING_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "led")
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
@@ -48,7 +48,7 @@ from omnis_wing.absolute.broker_guard import (  # noqa: E402
     broker_dispatch_scope,
     require_broker_dispatch,
 )
-from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.preflight import run_preflight  # noqa: E402
 from omnis_wing.absolute.signed_policy import (  # noqa: E402
     PolicyError,
@@ -214,7 +214,7 @@ class P0_2_BrokerSoleJoinTests(unittest.TestCase):
         assert_no_agent_governed_bypass(ROOT)
 
     def test_direct_governed_call_raises(self):
-        from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+        from omnis_wing.absolute.wing_chat_join import governed_chat_completions_create
         from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
 
         client = FakeClient()
@@ -274,7 +274,7 @@ class P0_2_BrokerSoleJoinTests(unittest.TestCase):
         governed_chat_completions_create with fake client. Provider calls must
         stay 0 (DIRECT_SCOPE_BYPASS_PROVIDER_CALLS must not be 1).
         """
-        from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+        from omnis_wing.absolute.wing_chat_join import governed_chat_completions_create
         from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
 
         client = FakeClient()
@@ -308,7 +308,7 @@ class P0_2_BrokerSoleJoinTests(unittest.TestCase):
 """Planted dynamic/late-import bypass — must be rejected by source guard."""
 import importlib
 
-_mod = "omnis_wing.absolute." + "hermes_chat_join"
+_mod = "omnis_wing.absolute." + "wing_chat_join"
 _helper = "governed_" + "chat_completions_create"
 _scope_mod = "omnis_wing.absolute." + "broker_guard"
 _scope_name = "broker_dispatch_" + "scope"

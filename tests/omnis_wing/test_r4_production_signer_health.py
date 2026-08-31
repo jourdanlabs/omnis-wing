@@ -19,7 +19,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 _tmp_home = tempfile.mkdtemp(prefix="omnis-wing-r4-home-")
-os.environ["HERMES_HOME"] = _tmp_home
+os.environ["WING_HOME"] = _tmp_home
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 for _name in ("requests", "yaml"):
     if _name not in sys.modules:
@@ -35,7 +35,7 @@ os.environ.setdefault("OMNIS_WING_SIGNER_MODE", "test")
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.envelope import SourceProvenance  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import (  # noqa: E402
     EvidenceSession,
     WingEgressContext,
     WingRefusal,

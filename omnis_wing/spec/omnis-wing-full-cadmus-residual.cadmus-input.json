@@ -23,7 +23,7 @@
     "Status READY_FOR_GATE only — never self-CLEAR"
   ],
   "non_goals": [
-    "Live Hermes replace",
+    "Live WING replace",
     "Keychain enroll/rotate/export",
     "Remote production anchor durability claim",
     "Secure Enclave attestation",

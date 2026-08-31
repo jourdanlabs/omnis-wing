@@ -12,7 +12,7 @@
   ],
   "non_claims": [
     "not full workstation TERMINUS",
-    "not live Hermes cutover complete until M7 sealed+Bulma CLEAR",
+    "not live WING cutover complete until M7 sealed+Bulma CLEAR",
     "not safe raw protected to CN remote",
     "not hardware attested without attestation",
     "not anchored without verified external anchor"

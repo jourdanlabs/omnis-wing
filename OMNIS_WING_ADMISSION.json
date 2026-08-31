@@ -1,14 +1,14 @@
 {
   "product_name": "OMNIS WING",
   "contract_protocol_version": "omnis-wing.admission.v0",
-  "upstream_hermes_url": "https://github.com/NousResearch/Hermes-Agent.git",
-  "upstream_hermes_commit": "2213ea9fa73ab06cf667c1bfb1e99c8de3541589",
+  "upstream_wing_url": "https://github.com/NousResearch/OMNIS-WING.git",
+  "upstream_wing_commit": "2213ea9fa73ab06cf667c1bfb1e99c8de3541589",
   "fork_commit": "204a6a302af5e47d63de7e948e735f97a7d84e44",
   "fork_commit_meaning": "First commit on omnis-wing/v0-admission that introduced the admission harness (ancestor of HEAD; not a self-hashing HEAD pin).",
   "cadmus_input_sha256": "b92d45d70cef12e1e123504c9465088b67ad8158161a85172d726336f3850de4",
   "cadmus_input_path": "omnis_wing/spec/omnis-wing-v0.cadmus-input.json",
   "isolation": {
-    "live_hermes_path_untouched": "~/.hermes/hermes-agent",
+    "live_wing_path_untouched": "~/.omnis-wing/omnis-wing",
     "no_credentials_copied": true,
     "no_omniskey_runtime_copied": true,
     "no_env_copied": true

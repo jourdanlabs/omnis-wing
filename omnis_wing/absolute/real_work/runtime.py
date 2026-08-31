@@ -15,7 +15,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 from omnis_wing.absolute.envelope import SourceProvenance
 from omnis_wing.absolute.evaluator import TransmissionReceipt
-from omnis_wing.absolute.hermes_chat_join import (
+from omnis_wing.absolute.wing_chat_join import (
     EvidenceSession,
     OutcomeUnknownError,
     WingEgressContext,
@@ -219,7 +219,7 @@ def _messages(api_kwargs: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _workspace_identity(agent: Any) -> str:
     root = Path(
         os.environ.get("OMNIS_WING_WORKSPACE")
-        or os.environ.get("HERMES_WORKSPACE")
+        or os.environ.get("WING_WORKSPACE")
         or os.getcwd()
     ).expanduser()
     # This stays local and is hashed before registration. Include the repo head

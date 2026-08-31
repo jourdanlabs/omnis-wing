@@ -274,7 +274,7 @@ class AbsoluteR1Tests(unittest.TestCase):
         self.assertGreaterEqual(len(governed), 5)
         for p in governed:
             self.assertTrue(p.is_file(), p)
-        for entry in man["inherited_hermes_transport"]:
+        for entry in man["inherited_wing_transport"]:
             self.assertIn(
                 entry["status"],
                 ("ungoverned", "inbound", "outside_r1", "outside_r2"),

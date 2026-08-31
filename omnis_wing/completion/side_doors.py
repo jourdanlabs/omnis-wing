@@ -64,10 +64,10 @@ MODULE_HANDLER_TARGETS: Dict[str, Tuple[str, Tuple[str, ...]]] = {
         "agent.auxiliary_client.chat_completions",
         (),  # special: name-pattern patch
     ),
-    "hermes_cli.goals": ("hermes_cli.goals_kanban_profile", ()),
-    "hermes_cli.kanban_decompose": ("hermes_cli.goals_kanban_profile", ()),
-    "hermes_cli.kanban_specify": ("hermes_cli.goals_kanban_profile", ()),
-    "hermes_cli.profile_describer": ("hermes_cli.goals_kanban_profile", ()),
+    "wing_cli.goals": ("wing_cli.goals_kanban_profile", ()),
+    "wing_cli.kanban_decompose": ("wing_cli.goals_kanban_profile", ()),
+    "wing_cli.kanban_specify": ("wing_cli.goals_kanban_profile", ()),
+    "wing_cli.profile_describer": ("wing_cli.goals_kanban_profile", ()),
 }
 
 # route_id -> modules that implement it
@@ -80,11 +80,11 @@ ROUTE_MODULES: Dict[str, Tuple[str, ...]] = {
     "mini_swe_runner": ("mini_swe_runner",),
     "trajectory_compressor": ("trajectory_compressor",),
     "agent.auxiliary_client.chat_completions": ("agent.auxiliary_client",),
-    "hermes_cli.goals_kanban_profile": (
-        "hermes_cli.goals",
-        "hermes_cli.kanban_decompose",
-        "hermes_cli.kanban_specify",
-        "hermes_cli.profile_describer",
+    "wing_cli.goals_kanban_profile": (
+        "wing_cli.goals",
+        "wing_cli.kanban_decompose",
+        "wing_cli.kanban_specify",
+        "wing_cli.profile_describer",
     ),
     "plugins.image_gen.openai": ("plugins.image_gen.openai",),
     "plugins.image_gen.openai-codex": ("plugins.image_gen.openai_codex", "plugins.image_gen.openai-codex"),
@@ -242,7 +242,7 @@ def _patch_module_handlers(mod_name: str) -> bool:
         return False
     mod = sys.modules[mod_name]
     if mod_name not in MODULE_HANDLER_TARGETS and not mod_name.startswith("plugins."):
-        # plugin / hermes handled below via ROUTE_MODULES
+        # plugin / wing handled below via ROUTE_MODULES
         pass
 
     if mod_name in MODULE_HANDLER_TARGETS:
@@ -264,7 +264,7 @@ def _patch_module_handlers(mod_name: str) -> bool:
             if hit:
                 _STATE.patched_modules.add(mod_name)
             return hit > 0
-        if mod_name.startswith("hermes_cli."):
+        if mod_name.startswith("wing_cli."):
             hit = _patch_pattern_callables(
                 mod, route_id, ("llm", "complete", "chat", "describe", "generate", "call_model")
             )
@@ -584,8 +584,8 @@ def _evaluate_and_eager_arm() -> None:
                 continue
             if _eager_resolve_module(mod_name, route_id):
                 armed_any = True
-        # hermes multi-module: ARMED if at least one module surface disabled OR all missing stubbed
-        if route_id == "hermes_cli.goals_kanban_profile":
+        # wing multi-module: ARMED if at least one module surface disabled OR all missing stubbed
+        if route_id == "wing_cli.goals_kanban_profile":
             # all listed modules must be resolved (stub or patch)
             ok = all(
                 (m in sys.modules and _module_entrypoints_disabled(m))
@@ -596,7 +596,7 @@ def _evaluate_and_eager_arm() -> None:
             ok = all(m in sys.modules and _module_entrypoints_disabled(m) for m in mods)
             routes[route_id] = "ARMED" if ok else "UNRESOLVED"
             if not ok:
-                errors.append(f"hermes_unarmed:{route_id}")
+                errors.append(f"wing_unarmed:{route_id}")
             continue
 
         if route_id.startswith("plugins."):

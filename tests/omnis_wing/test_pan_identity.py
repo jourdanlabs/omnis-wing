@@ -21,7 +21,7 @@ from omnis_wing.sealed_soul import (
     load_pan_soul,
     load_sealed_soul,
     parse_soul_markdown,
-    stage_pan_soul_for_hermes,
+    stage_pan_soul_for_wing,
     verify_sealed_soul,
     verify_sealed_soul_python,
 )
@@ -67,7 +67,7 @@ class TestPanSealedSoul(unittest.TestCase):
         loaded = load_pan_soul(MTS_SOULS)
         self.assertEqual(loaded.name, "Pan")
         self.assertEqual(loaded.soul_id, PAN_SOUL_ID)
-        self.assertIn("not generic Hermes bread", loaded.identity_card)
+        self.assertIn("not generic WING bread", loaded.identity_card)
         self.assertIn(str(loaded.soul_path), loaded.identity_card)
         self.assertIn("PannyWanny", loaded.soul_text)
 
@@ -96,7 +96,7 @@ class TestPanSealedSoul(unittest.TestCase):
             self.skipTest(f"sealed Pan package missing at {self.pan_pkg}")
         with tempfile.TemporaryDirectory() as tmp:
             profile = Path(tmp) / "pan-wing"
-            loaded = stage_pan_soul_for_hermes(profile, MTS_SOULS)
+            loaded = stage_pan_soul_for_wing(profile, MTS_SOULS)
             soul_dest = profile / "SOUL.md"
             self.assertTrue(soul_dest.is_file())
             staged = parse_soul_markdown(soul_dest.read_text(encoding="utf-8"))

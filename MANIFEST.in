@@ -6,14 +6,14 @@ graft locales
 # Swift bridge source). package-data covers the wheel; graft covers sdist.
 graft omnis_wing
 # Dogfood / production launchers and operator scripts shipped with sdist.
-include scripts/hermes-wing
-include scripts/hermes-wing-prod
+include scripts/wing-dogfood
+include scripts/wing-prod
 include scripts/omnis-wing-operator
 include scripts/omnis-wing-distribution-gate
 include scripts/run_omnis_wing_v0_tests.sh
 include docs/omnis-wing-operator-runbook.md
 # Bundled plugin manifests (plugin.yaml / plugin.yml). Without these the
-# PluginManager scan (hermes_cli/plugins.py) finds zero plugins on installs
+# PluginManager scan (wing_cli/plugins.py) finds zero plugins on installs
 # built from the sdist (e.g. Homebrew, downstream packagers). package-data
 # below covers the wheel; this covers the sdist. See #34034 / #28149.
 recursive-include plugins plugin.yaml plugin.yml

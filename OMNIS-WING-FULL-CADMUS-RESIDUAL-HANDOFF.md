@@ -13,7 +13,7 @@
 | P0 CLEAR base | `dfef719c2d0bcbb62dc13c9b2e0273ba27e3eb4b` |
 | Prior HOLD (image unbound transmit_fn) | `7ce5b803012e81f860f48f01dd97b2fa06cc6482` |
 | **Implementation (image dest bind)** | `07224c8be944835da612d7c96022c733a40cbd8b` |
-| Live Hermes | `2213ea9…` untouched |
+| Live WING | `2213ea9…` untouched |
 | Residual CADMUS sha256 | `4f79d51def6f5e2d509a0aa7b038c2863189f4239648e4c5be1da085133fa6b2` |
 
 ## Cold

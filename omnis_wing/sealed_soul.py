@@ -382,14 +382,14 @@ def build_identity_card(
     verification: SoulVerification,
 ) -> str:
     return (
-        f"You are {name}. This is your WING identity seat — not generic Hermes bread.\n\n"
+        f"You are {name}. This is your WING identity seat — not generic WING bread.\n\n"
         f"Sealed soul package: `{soul_path}`\n"
         f"MTS soul_id: `{soul_id}`\n"
         f"Verification: {verification.verdict}\n\n"
         "Before you answer:\n"
         f"1. Operate from the sealed soul at `{soul_path}`.\n"
         f"2. If that file is missing or fails verification, reply only: {REFUSAL_NOT_OPEN}\n"
-        f"3. Do not invent a second {name}. Do not answer as default Hermes.\n"
+        f"3. Do not invent a second {name}. Do not answer as default WING.\n"
     )
 
 
@@ -442,7 +442,7 @@ def load_pan_soul(souls_dir: Optional[Path] = None) -> LoadedSoul:
     return load_sealed_soul(PAN_SOUL_ID, souls_dir)
 
 
-def stage_pan_soul_for_hermes(
+def stage_pan_soul_for_wing(
     profile_home: Path,
     souls_dir: Optional[Path] = None,
     vault_dir: Optional[Path] = None,
@@ -455,7 +455,7 @@ def stage_pan_soul_for_hermes(
     soul_dest.write_text(loaded.soul_text, encoding="utf-8")
     pack = load_chamber_memory(vault_dir)
     wired = append_chamber_memory(loaded.soul_text, pack)
-    # Hermes reads MEMORY.md beside SOUL.md. Soul file stays sealed-only.
+    # WING reads MEMORY.md beside SOUL.md. Soul file stays sealed-only.
     extras = wired["system"][len(loaded.soul_text) :].lstrip()
     memory_dest = profile_home / "MEMORY.md"
     if extras:

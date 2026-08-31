@@ -17,11 +17,11 @@ rsync -a \
   --exclude '.env' \
   --exclude '*.pyc' \
   "$ROOT/omnis_wing" "$ROOT/tests/omnis_wing" "$ROOT/agent" "$ROOT/scripts" \
-  "$ROOT/tools" "$ROOT/hermes_cli" "$ROOT/gateway" "$ROOT/plugins" \
+  "$ROOT/tools" "$ROOT/wing_cli" "$ROOT/gateway" "$ROOT/plugins" \
   "$ROOT/cron" \
   "$OUT/" 2>/dev/null || {
   # fallback without rsync
-  for d in omnis_wing tests/omnis_wing agent scripts tools hermes_cli gateway plugins cron; do
+  for d in omnis_wing tests/omnis_wing agent scripts tools wing_cli gateway plugins cron; do
     if [[ -e "$ROOT/$d" ]]; then
       mkdir -p "$OUT/$(dirname "$d")"
       cp -R "$ROOT/$d" "$OUT/$d"
@@ -53,8 +53,8 @@ rsync -a \
 
 export OMNIS_WING_SIGNER_MODE="${OMNIS_WING_SIGNER_MODE:-test}"
 export PYTHONPATH="$OUT${PYTHONPATH:+:$PYTHONPATH}"
-export HERMES_HOME="${HERMES_HOME:-$(mktemp -d -t wing-seal-home)}"
-export OMNIS_WING_LEDGER_DIR="${OMNIS_WING_LEDGER_DIR:-$HERMES_HOME/led}"
+export WING_HOME="${WING_HOME:-$(mktemp -d -t wing-seal-home)}"
+export OMNIS_WING_LEDGER_DIR="${OMNIS_WING_LEDGER_DIR:-$WING_HOME/led}"
 
 if command -v python3.11 >/dev/null 2>&1; then PY=python3.11
 elif command -v python3.12 >/dev/null 2>&1; then PY=python3.12

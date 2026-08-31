@@ -25,7 +25,7 @@ _TRANSPORT_CALL_RES = (
 DEFAULT_SCAN_GLOBS = (
     "agent/**/*.py",
     "tools/**/*.py",
-    "hermes_cli/**/*.py",
+    "wing_cli/**/*.py",
     "plugins/**/*.py",
     "cron/**/*.py",
 )

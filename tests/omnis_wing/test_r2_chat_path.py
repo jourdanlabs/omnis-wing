@@ -1,4 +1,4 @@
-"""R2/R2.1: real Hermes non-streaming chat path through WING boundary."""
+"""R2/R2.1: real WING non-streaming chat path through WING boundary."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 _tmp_home = tempfile.mkdtemp(prefix="omnis-wing-r2-home-")
-os.environ["HERMES_HOME"] = _tmp_home
+os.environ["WING_HOME"] = _tmp_home
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 for _name in ("requests", "yaml"):
     if _name not in sys.modules:
@@ -36,7 +36,7 @@ os.environ.setdefault("OMNIS_WING_SIGNER_MODE", "test")
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
 from omnis_wing.absolute.envelope import IntendedDestination, SourceProvenance  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import (  # noqa: E402
     EvidenceSession,
     WingEgressContext,
     WingRefusal,
@@ -222,7 +222,7 @@ class WingR2ChatPathTests(unittest.TestCase):
         from omnis_wing.absolute.receipt_spine import UnavailableSigner, EvidenceLedger
         import tempfile
         from pathlib import Path as P
-        from omnis_wing.absolute.hermes_chat_join import EvidenceSession
+        from omnis_wing.absolute.wing_chat_join import EvidenceSession
         td = P(tempfile.mkdtemp())
         ev = EvidenceSession(signer=UnavailableSigner(), ledger=EvidenceLedger(td / "l.jsonl"))
         client3 = FakeClient(base_url=US_BASE)
@@ -269,10 +269,10 @@ class WingR2ChatPathTests(unittest.TestCase):
         man_path = ROOT / "omnis_wing" / "coverage" / "ai_egress_coverage_r1.json"
         man = json.loads(man_path.read_text(encoding="utf-8"))
         paths = {e["path"] for e in man["governed_r2"]}
-        self.assertIn("omnis_wing/absolute/hermes_chat_join.py", paths)
+        self.assertIn("omnis_wing/absolute/wing_chat_join.py", paths)
         self.assertIn("agent/chat_completion_helpers.py", paths)
         self.assertFalse(man.get("claims_whole_tree_ai_egress"))
-        self.assertFalse(man.get("claims_all_hermes_chat_paths"))
+        self.assertFalse(man.get("claims_all_wing_chat_paths"))
 
     # ── R2.1 P0-A ─────────────────────────────────────────────────────────
 

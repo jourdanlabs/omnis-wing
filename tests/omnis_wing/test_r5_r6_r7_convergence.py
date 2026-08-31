@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 _tmp = tempfile.mkdtemp(prefix="wing-r5r7-")
-os.environ["HERMES_HOME"] = _tmp
+os.environ["WING_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "ledgers")
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
@@ -39,7 +39,7 @@ from agent.chat_completion_helpers import (  # noqa: E402
     interruptible_api_call,
     interruptible_streaming_api_call,
 )
-from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import (  # noqa: E402
     EvidenceSession,
     WingEgressContext,
     WingRefusal,

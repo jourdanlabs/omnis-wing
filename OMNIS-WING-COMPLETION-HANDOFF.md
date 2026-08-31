@@ -80,7 +80,7 @@ Forbidden states `outside` / `later` / unexplained exemption: **none**.
 
 ### DISABLED (product refuse before transport)
 
-vision, tts, transcription, mixture_of_agents, image_generation_tool, image_gen plugins, video_gen, hermes_cli goals/kanban/profile model calls, mini_swe_runner, trajectory_compressor, auxiliary_client fanout, gateway messaging (not model AI egress).
+vision, tts, transcription, mixture_of_agents, image_generation_tool, image_gen plugins, video_gen, wing_cli goals/kanban/profile model calls, mini_swe_runner, trajectory_compressor, auxiliary_client fanout, gateway messaging (not model AI egress).
 
 ## Cold suite
 
@@ -140,11 +140,11 @@ python -m omnis_wing.operator_cli compile-bridge
 
 ## Coverage statement
 
-On this fork, model-bound traffic that still runs goes through the governed universal/chat join with auto provenance and the R3.1.1 evidence spine, or it hits a **hard product disable**. Captain does not pick a safety mode. Foreign/CN destinations cannot receive protected/project-derived or secret-shaped payloads on covered routes. This is a **completion candidate for the WING fork**, not a claim that live `~/.hermes/hermes-agent` is already switched over.
+On this fork, model-bound traffic that still runs goes through the governed universal/chat join with auto provenance and the R3.1.1 evidence spine, or it hits a **hard product disable**. Captain does not pick a safety mode. Foreign/CN destinations cannot receive protected/project-derived or secret-shaped payloads on covered routes. This is a **completion candidate for the WING fork**, not a claim that live `~/.omnis-wing/omnis-wing` is already switched over.
 
 ## Non-claims (exact)
 
-- Live Hermes install not modified, not cut over, not configured.
+- Live WING install not modified, not cut over, not configured.
 - No live provider calls during build; no API keys/tokens inspected.
 - Captain Keychain tag not deleted/rotated/exported; no false SE attestation.
 - Remote anchor replication not implemented (`NOT_CONFIGURED`).

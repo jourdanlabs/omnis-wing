@@ -1,9 +1,9 @@
 import ignore from 'ignore'
 
 import { desktopFsCacheKey, desktopGitRoot, readDesktopDir, readDesktopFileDataUrl } from '@/lib/desktop-fs'
-import type { HermesReadDirEntry, HermesReadDirResult } from '@/global'
+import type { WingReadDirEntry, WingReadDirResult } from '@/global'
 
-export type ProjectTreeEntry = HermesReadDirEntry
+export type ProjectTreeEntry = WingReadDirEntry
 
 interface GitignoreRule {
   base: string
@@ -104,7 +104,7 @@ async function gitignoreFor(dir: string) {
   return cached
 }
 
-function ignoredBy(rules: GitignoreRule[], entry: HermesReadDirEntry) {
+function ignoredBy(rules: GitignoreRule[], entry: WingReadDirEntry) {
   return rules.some(rule => {
     const rel = relativeTo(rule.base, entry.path)
 
@@ -116,7 +116,7 @@ function ignoredBy(rules: GitignoreRule[], entry: HermesReadDirEntry) {
   })
 }
 
-async function filterIgnored(entries: HermesReadDirEntry[], rootPath: string, dirPath: string) {
+async function filterIgnored(entries: WingReadDirEntry[], rootPath: string, dirPath: string) {
   const root = await gitRootFor(rootPath)
 
   if (!root) {
@@ -130,8 +130,8 @@ async function filterIgnored(entries: HermesReadDirEntry[], rootPath: string, di
   return rules.length > 0 ? entries.filter(entry => !ignoredBy(rules, entry)) : entries
 }
 
-export async function readProjectDir(dirPath: string, rootPath = dirPath): Promise<HermesReadDirResult> {
-  if (!window.hermesDesktop) {
+export async function readProjectDir(dirPath: string, rootPath = dirPath): Promise<WingReadDirResult> {
+  if (!window.wingDesktop) {
     return { entries: [], error: 'no-bridge' }
   }
 

@@ -22,7 +22,7 @@
 | Starting impl (R5–R7) | `b5a668f52c3c6462204560d2262f937768cc3b12` |
 | Starting head | `8b65e15eafa9ac1152c0eb450a293a071e1d5479` |
 | **This implementation** | bda40227373eec80020f48ffaf4aba0ab8e22b94 |
-| Live Hermes | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` **untouched** |
+| Live WING | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` **untouched** |
 
 ## Cold
 
@@ -53,7 +53,7 @@ These prevent saying **TERMINUS ABSOLUTE COMPLETE** from this pass:
 
 1. **Not sealed install-artifact conformance** — cold suite runs against source tree / PYTHONPATH fork, not a packaged immutable artifact (M7 package/seal incomplete).
 2. **Not every modality in zero-tolerance matrix** — image/embedding/audio end-to-end hostile corpus not fully GOVERNED as product features (many remain DISABLED side-doors by design; contract forbids flipping to DISABLED only to pass counts — product still does not ship those modalities as GOVERNED).
-3. **Not live production cutover** — live Hermes untouched; no Captain-approved live smoke.
+3. **Not live production cutover** — live WING untouched; no Captain-approved live smoke.
 4. **Not remote anchor production** — anchor is honest NOT_CONFIGURED / local test double only.
 5. **Not Secure Enclave attestation claim**.
 6. **Not workstation/IDE/terminal/browser/Git governance**.

@@ -49,7 +49,7 @@ def glass_state(
             "browser",
             "git",
             "third_party_extensions",
-            "live_hermes_install_until_cutover",
+            "live_wing_install_until_cutover",
         ],
         "last_phase": display_phase,
         "last_decision": last_decision,

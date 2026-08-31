@@ -152,15 +152,15 @@ class OmnisWingV0Tests(unittest.TestCase):
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(data["product_name"], "OMNIS WING")
         self.assertEqual(data["contract_protocol_version"], CONTRACT_PROTOCOL_VERSION)
-        self.assertEqual(data["upstream_hermes_commit"], BASE_COMMIT)
-        self.assertIn("NousResearch/Hermes-Agent", data["upstream_hermes_url"])
+        self.assertEqual(data["upstream_wing_commit"], BASE_COMMIT)
+        self.assertIn("NousResearch/OMNIS-WING", data["upstream_wing_url"])
         self.assertEqual(data["cadmus_input_sha256"], CADMUS_SHA)
         self.assertEqual(len(data["fork_commit"]), 40)
         # fork_commit is the introduction commit (ancestor of HEAD), not a self-hashing HEAD pin
         head = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=str(ROOT), text=True
         ).strip()
-        base = data["upstream_hermes_commit"]
+        base = data["upstream_wing_commit"]
         fork = data["fork_commit"]
         # base is ancestor of fork and fork is ancestor of HEAD
         rc1 = subprocess.call(

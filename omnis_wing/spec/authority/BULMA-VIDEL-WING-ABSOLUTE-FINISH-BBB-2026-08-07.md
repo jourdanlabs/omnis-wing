@@ -9,7 +9,7 @@ silently sending protected project material to a remote provider. No
 `8b65e15eafa9ac1152c0eb450a293a071e1d5479`, CADMUS
 `7cf045442eb4112eea7d9bfe7b4dff59087062ac30740801ad23e31fd5c42e79`.
 It proves a substantial selected-fork layer. It is **not** full TERMINUS
-ABSOLUTE, not live Hermes, and not authorization to transmit raw protected
+ABSOLUTE, not live WING, and not authorization to transmit raw protected
 material to a Chinese remote provider.
 
 ## The outcome to build
@@ -106,7 +106,7 @@ requirements:
 
 ## W12 — controlled live cutover (separate final gate)
 
-Do not edit the dirty live Hermes checkout. Create a clean, pinned deployment
+Do not edit the dirty live WING checkout. Create a clean, pinned deployment
 target/config and an explicit install/attach command. Before any live provider
 request, demonstrate:
 
@@ -128,13 +128,13 @@ can-fails, and an exact route coverage table. No builder self-CLEAR.
 
 `TERMINUS ABSOLUTE · WING-OWNED AI EGRESS GOVERNED` is eligible only when W8–
 W11 have independent gate evidence for every supported WING route. It remains
-forbidden to say `workstation protected`, `all Hermes egress`, or `safe to send
+forbidden to say `workstation protected`, `all WING egress`, or `safe to send
 raw protected code to a Chinese remote provider` unless an independently
 enforced boundary actually covers those claims.
 
 ## Hard guardrails
 
-- Work only in `~/projects/omnis-wing`; live Hermes at `2213ea9…` stays
+- Work only in `~/projects/omnis-wing`; live WING at `2213ea9…` stays
   untouched.
 - No live provider request, Keychain mutation, publish, push, or packaging
   during build/gate work without Captain's explicit authorization.

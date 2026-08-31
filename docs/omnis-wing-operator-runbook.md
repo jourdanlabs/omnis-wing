@@ -1,7 +1,7 @@
 # OMNIS WING clean-profile operator runbook
 
 This runbook repeats the locally governed WING startup path without replacing
-live Hermes, printing credentials, mutating Keychain enrollment, or making a
+live WING, printing credentials, mutating Keychain enrollment, or making a
 provider request. It is bounded to ordinary non-stream chat plus the buffered
 stream adapter through pinned local CADUCEUS.
 
@@ -26,22 +26,22 @@ the operator configuration is written. CADUCEUS imports its exact sibling
 
 ## 2. Create an isolated profile
 
-Choose a new profile path that is not `~/.hermes` and keep all mutable state
+Choose a new profile path that is not `~/.omnis-wing` and keep all mutable state
 under it:
 
 ```bash
-export OMNIS_WING_PROFILE_HOME="$HOME/.hermes/profiles/omnis-wing-dogfood"
-export HERMES_HOME="$OMNIS_WING_PROFILE_HOME"
-export CADUCEUS_STATE_DIR="$HERMES_HOME/caduceus-state"
-export CADUCEUS_LANES="$HERMES_HOME/operator/caduceus-lanes.yaml"
+export OMNIS_WING_PROFILE_HOME="$HOME/.omnis-wing/profiles/omnis-wing-dogfood"
+export WING_HOME="$OMNIS_WING_PROFILE_HOME"
+export CADUCEUS_STATE_DIR="$WING_HOME/caduceus-state"
+export CADUCEUS_LANES="$WING_HOME/operator/caduceus-lanes.yaml"
 ```
 
 Copy the tracked production and real-work templates into
-`$HERMES_HOME/operator/`. Set the production ledger inside this profile and
+`$WING_HOME/operator/`. Set the production ledger inside this profile and
 set its bridge path to:
 
 ```text
-$HERMES_HOME/omnis-wing-runtime/bin/omnis_wing_keychain
+$WING_HOME/omnis-wing-runtime/bin/omnis_wing_keychain
 ```
 
 The real-work config must name the exact CADUCEUS worktree, pin, unused
@@ -49,10 +49,10 @@ loopback port, instance id, and service-token environment variable. Install a
 signed WING policy and trust record, then export their paths:
 
 ```bash
-export OMNIS_WING_PRODUCTION_CONFIG="$HERMES_HOME/operator/wing-production.yaml"
-export OMNIS_WING_REAL_WORK_CONFIG="$HERMES_HOME/operator/real-work.json"
-export OMNIS_WING_POLICY_PATH="$HERMES_HOME/operator/wing-policy.json"
-export OMNIS_WING_POLICY_TRUST_PATH="$HERMES_HOME/operator/wing-policy-trust.json"
+export OMNIS_WING_PRODUCTION_CONFIG="$WING_HOME/operator/wing-production.yaml"
+export OMNIS_WING_REAL_WORK_CONFIG="$WING_HOME/operator/real-work.json"
+export OMNIS_WING_POLICY_PATH="$WING_HOME/operator/wing-policy.json"
+export OMNIS_WING_POLICY_TRUST_PATH="$WING_HOME/operator/wing-policy-trust.json"
 ```
 
 Provider and local service capabilities remain in the inherited operator
@@ -98,7 +98,7 @@ health. It makes no model request. A foreign listener refuses as
 After the cold preflight is `READY`, launch the isolated product surface:
 
 ```bash
-scripts/hermes-wing
+scripts/wing-dogfood
 ```
 
 Exit WING normally from its own interface. Do not use broad process-kill
@@ -117,7 +117,7 @@ scripts/omnis-wing-operator stop
 The stop command requires the private ownership record, exact PID start time,
 exact command, configured base, CADUCEUS pin, and entry path to match. Missing
 or mismatched ownership refuses; it never searches for or kills other Node,
-Hermes, or CADUCEUS processes.
+WING, or CADUCEUS processes.
 
 ## Actionable refusals
 

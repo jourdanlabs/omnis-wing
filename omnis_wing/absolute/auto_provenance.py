@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from omnis_wing.absolute.envelope import SourceProvenance
-from omnis_wing.absolute.hermes_chat_join import EvidenceSession, WingEgressContext
+from omnis_wing.absolute.wing_chat_join import EvidenceSession, WingEgressContext
 from omnis_wing.absolute.receipt_spine import EvidenceLedger, UnavailableSigner, make_test_signer
 
 _DEFAULT_PROTECTED_NAME_MARKERS = (
@@ -21,7 +21,7 @@ _DEFAULT_PROTECTED_NAME_MARKERS = (
 
 
 def workspace_root() -> Path:
-    env = os.environ.get("OMNIS_WING_WORKSPACE") or os.environ.get("HERMES_WORKSPACE")
+    env = os.environ.get("OMNIS_WING_WORKSPACE") or os.environ.get("WING_WORKSPACE")
     if env:
         return Path(env).expanduser().resolve()
     return Path.cwd().resolve()

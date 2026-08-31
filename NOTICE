@@ -1,0 +1,36 @@
+OMNIS WING
+==========
+
+OMNIS WING is built on Hermes Agent by Nous Research — the OMNIS layer,
+BIFROST integration, and CADUCEUS routing are JourdanLabs'.
+
+Upstream: https://github.com/NousResearch/hermes-agent
+Product:  https://github.com/jourdanlabs/omnis-wing
+
+License: MIT (see LICENSE). Copyright (c) 2025 Nous Research.
+Copyright (c) 2026 JourdanLabs for the OMNIS WING layer.
+
+State directory
+---------------
+
+Product state lives in ~/.omnis-wing/ (POSIX) or
+%LOCALAPPDATA%\omnis-wing (Windows).
+
+The pre-rename directory was ~/.hermes/ (POSIX) or
+%LOCALAPPDATA%\hermes (Windows). On first run, if the new home does not
+already look like agent state, session files are copied from the legacy
+directory. The source checkout (hermes-agent/) is not copied. The legacy
+directory is not deleted; a pointer file is left behind.
+
+This file, LICENSE, and the README attribution paragraph are the
+intended remaining "Hermes" hits besides:
+
+- this NOTICE (legacy path names, upstream URL)
+- LICENSE (Nous copyright)
+- README.md (one attribution sentence + upstream URL)
+- git remote `upstream` → NousResearch/hermes-agent
+- wing_constants.py migration (must name ~/.hermes to find it)
+- tools/threat_patterns.py and tools/skills_guard.py (legacy attack paths)
+- tools/approval.py (legacy `hermes gateway` / `hermes update` commands)
+- scripts/release.py contributor emails (historical identities)
+- openrouter/hermes3:70b and similar upstream model slugs

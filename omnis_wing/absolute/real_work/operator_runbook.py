@@ -88,26 +88,26 @@ def _scrub_public_text(text: str) -> str:
 
 
 def _require_isolated_profile() -> Path:
-    raw_home = (os.environ.get("HERMES_HOME") or "").strip()
+    raw_home = (os.environ.get("WING_HOME") or "").strip()
     raw_profile = (os.environ.get("OMNIS_WING_PROFILE_HOME") or "").strip()
     if not raw_home or not raw_profile:
         raise RealWorkConfigError("isolated_profile_home_required")
     home_input = Path(raw_home).expanduser()
     profile_input = Path(raw_profile).expanduser()
     if not home_input.is_absolute() or not profile_input.is_absolute():
-        raise RealWorkConfigError("hermes_home_must_equal_omnis_wing_profile_home")
+        raise RealWorkConfigError("wing_home_must_equal_omnis_wing_profile_home")
     if home_input.is_symlink() or profile_input.is_symlink():
         raise RealWorkConfigError("profile_home_symlink_refused")
     try:
         home = home_input.resolve(strict=False)
         profile = profile_input.resolve(strict=False)
-        live_home = (Path.home() / ".hermes").resolve(strict=False)
+        live_home = (Path.home() / ".omnis-wing").resolve(strict=False)
     except (OSError, RuntimeError) as exc:
         raise RealWorkConfigError("profile_home_resolution_failed") from exc
     if home != profile:
-        raise RealWorkConfigError("hermes_home_must_equal_omnis_wing_profile_home")
+        raise RealWorkConfigError("wing_home_must_equal_omnis_wing_profile_home")
     if home == live_home:
-        raise RealWorkConfigError("live_default_hermes_home_refused")
+        raise RealWorkConfigError("live_default_wing_home_refused")
     mkdir_private_tree(home)
     inspect_controlled_dir(home)
     return home
@@ -124,7 +124,7 @@ def _assert_controlled_lineage(child: Path, parent: Path, reason: str) -> Path:
     # Rebase an operator spelling such as macOS /var onto the already
     # canonical profile. Only the system/profile prefix is resolved; controlled
     # descendant components remain lexical so they can be checked with lstat.
-    raw_home = (os.environ.get("HERMES_HOME") or "").strip()
+    raw_home = (os.environ.get("WING_HOME") or "").strip()
     if raw_home:
         alias_home = Path(os.path.abspath(str(Path(raw_home).expanduser())))
         try:

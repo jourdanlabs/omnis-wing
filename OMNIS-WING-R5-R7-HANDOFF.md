@@ -13,7 +13,7 @@
 | **R5–R7 implementation** | `b5a668f52c3c6462204560d2262f937768cc3b12` |
 | **R5–R7 handoff tip** | branch HEAD after this docs set — `git rev-parse HEAD` |
 | Prior base | `acce399e12130b09be31728ad452148630b7c47e` |
-| Live Hermes | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` **untouched** |
+| Live WING | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` **untouched** |
 | CADMUS R5–R7 | `omnis_wing/spec/omnis-wing-r5-r7-terminus-convergence.cadmus-input.json` |
 | CADMUS SHA-256 | `7cf045442eb4112eea7d9bfe7b4dff59087062ac30740801ad23e31fd5c42e79` |
 
@@ -83,7 +83,7 @@ cd ~/projects/omnis-wing && ./scripts/run_omnis_wing_v0_tests.sh
 ## Exact non-claims (what still blocks full TERMINUS ABSOLUTE)
 
 1. **Not full TERMINUS ABSOLUTE** — selected WING fork surface only  
-2. **Not live Hermes cutover** — `~/.hermes/hermes-agent` untouched  
+2. **Not live WING cutover** — `~/.omnis-wing/omnis-wing` untouched  
 3. **Not whole-tree / IDE / workstation egress governance**  
 4. **Protected material is not safe to send to a Chinese remote provider** — WING refuses project/protected/credential on CN and refuses non-generic sources on the permit path; a separate **REDACT** path is not built; never silently forward protected bytes  
 5. **No Keychain mutation / no live provider** in this cold suite  

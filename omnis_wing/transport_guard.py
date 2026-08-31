@@ -77,9 +77,9 @@ def scan_paths(paths: Iterable[Path]) -> list[str]:
 def r1_governed_paths(repo_root: Path) -> List[Path]:
     """Paths subject to the import/transport guard.
 
-    Coverage may list Hermes host files as governed_r2 for the join site, but
+    Coverage may list WING host files as governed_r2 for the join site, but
     those files still contain upstream HTTP imports. The guard applies to
-    omnis_wing package modules only (including R2 hermes_chat_join).
+    omnis_wing package modules only (including R2 wing_chat_join).
     """
     man_path = repo_root / "omnis_wing" / "coverage" / "ai_egress_coverage_r1.json"
     data = json.loads(man_path.read_text(encoding="utf-8"))

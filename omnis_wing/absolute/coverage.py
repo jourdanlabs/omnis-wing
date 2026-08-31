@@ -33,7 +33,7 @@ def assert_manifest_honest(root: Path) -> None:
             raise AssertionError(f"governed path missing: {entry['path']}")
         if entry.get("status") != "governed":
             raise AssertionError(f"governed entry bad status: {entry}")
-    for entry in man["inherited_hermes_transport"]:
+    for entry in man["inherited_wing_transport"]:
         if entry.get("status") not in (
             "ungoverned",
             "inbound",

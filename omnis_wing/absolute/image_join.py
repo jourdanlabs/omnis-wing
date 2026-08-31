@@ -19,7 +19,7 @@ from typing import Any, Optional
 from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
 from omnis_wing.absolute.envelope import IntendedDestination, OutboundEnvelope
 from omnis_wing.absolute.evaluator import Authorization, evaluate_decision
-from omnis_wing.absolute.hermes_chat_join import (
+from omnis_wing.absolute.wing_chat_join import (
     R2_COVERAGE_CLASS,
     R2_POLICY_VERSION,
     OutcomeUnknownError,

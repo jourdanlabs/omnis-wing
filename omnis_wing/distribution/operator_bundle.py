@@ -2,7 +2,7 @@
 
 The tracked repository ships secret-free templates only.  The bundle freezes
 those templates plus pin metadata into a digest-named directory an operator
-copies into ``$HERMES_HOME/operator/`` without credentials.
+copies into ``$WING_HOME/operator/`` without credentials.
 """
 
 from __future__ import annotations

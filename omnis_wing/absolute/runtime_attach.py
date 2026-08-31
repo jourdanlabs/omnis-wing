@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from omnis_wing.absolute.hermes_chat_join import EvidenceSession
+from omnis_wing.absolute.wing_chat_join import EvidenceSession
 from omnis_wing.absolute.ledger_security import LedgerSecurityError
 from omnis_wing.absolute.production_config import (
     ProductionConfigError,

@@ -21,7 +21,7 @@ from omnis_wing.absolute.universal_egress import (
     governed_callable_transmit,
     governed_streaming_create,
 )
-from omnis_wing.absolute.hermes_chat_join import governed_chat_completions_create
+from omnis_wing.absolute.wing_chat_join import governed_chat_completions_create
 from omnis_wing.absolute.image_join import governed_image_transmit
 
 _lock = threading.RLock()

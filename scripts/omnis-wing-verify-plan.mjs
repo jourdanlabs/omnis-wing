@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MTS_SOULS = join(process.env.HOME || '', 'projects', 'mts', 'souls');
 const PAN_SOUL_ID = 'soul_bb75a9fa2823';
-const LIVE_AGENT = join(process.env.HOME || '', '.hermes', 'hermes-agent');
+const LIVE_AGENT = join(process.env.HOME || '', '.omnis-wing', 'omnis-wing');
 
 function wingPython() {
 	for (const name of ['python3.11', 'python3.12', 'python3']) {
@@ -102,7 +102,7 @@ items.push(check(
 let dryOk = false;
 let dryNote = null;
 if (skipDry) {
-	const launcher = join(ROOT, 'scripts', 'hermes-wing');
+	const launcher = join(ROOT, 'scripts', 'wing-dogfood');
 	const script = join(ROOT, 'scripts', 'omnis_wing_cutover_dry_run.sh');
 	dryOk = existsSync(script) && existsSync(launcher);
 	dryNote = dryOk ? 'skipped (build already ran dry-run)' : 'missing cutover script or launcher';
@@ -114,7 +114,7 @@ if (skipDry) {
 }
 items.push(check(
 	'p0-dry-run',
-	'Path A cutover dry-run (no live hermes writes)',
+	'Path A cutover dry-run (no live wing writes)',
 	dryOk,
 	dryNote,
 ));
@@ -137,21 +137,21 @@ items.push(check(
 	soulScan.ok ? null : soulScan.issues.join('; '),
 ));
 
-const hermesWing = join(ROOT, 'scripts', 'hermes-wing');
-const hermesWingOk = existsSync(hermesWing) && (() => {
+const wingWing = join(ROOT, 'scripts', 'wing-dogfood');
+const wingWingOk = existsSync(wingWing) && (() => {
 	try {
-		const text = readFileSync(hermesWing, 'utf8');
+		const text = readFileSync(wingWing, 'utf8');
 		return /does not replace/i.test(text)
-			&& (text.includes('cli.py') || text.includes('hermes_cli.main'));
+			&& (text.includes('cli.py') || text.includes('wing_cli.main'));
 	} catch {
 		return false;
 	}
 })();
 items.push(check(
-	'p3-hermes-wing',
-	'Dogfood launcher scripts/hermes-wing',
-	hermesWingOk,
-	hermesWing,
+	'p3-wing-dogfood',
+	'Dogfood launcher scripts/wing-dogfood',
+	wingWingOk,
+	wingWing,
 ));
 
 const evidence = runUnittest('tests.omnis_wing.test_r3_evidence_spine');
@@ -163,8 +163,8 @@ if (existsSync(join(LIVE_AGENT, '.git'))) {
 	const stat = spawnSync('git', ['-C', LIVE_AGENT, 'status', '--porcelain'], { encoding: 'utf8' });
 	liveUntouched = before.status === 0;
 	items.push(check(
-		'p3-live-hermes-untouched',
-		'Live ~/.hermes/hermes-agent not modified by verify',
+		'p3-live-wing-untouched',
+		'Live ~/.omnis-wing/omnis-wing not modified by verify',
 		liveUntouched,
 		before.stdout?.trim() || LIVE_AGENT,
 	));
@@ -192,7 +192,7 @@ const report = {
 	},
 	path_a: {
 		dry_run_ok: dryOk,
-		hermes_wing: hermesWing,
+		wing_wing: wingWing,
 		live_agent: LIVE_AGENT,
 		dry_run_skipped: skipDry,
 	},
@@ -201,7 +201,7 @@ const report = {
 		baseline_v0_tests: 196,
 	},
 	manual: [
-		'Path C (replace live ~/.hermes/hermes-agent) forbidden without explicit Captain order',
+		'Path C (replace live ~/.omnis-wing/omnis-wing) forbidden without explicit Captain order',
 		'Keychain enroll is Captain-explicit only',
 		'Optional: wing pan chat smoke with provider keys',
 	],

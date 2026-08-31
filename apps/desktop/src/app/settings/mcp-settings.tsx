@@ -4,19 +4,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { getHermesConfigRecord, type HermesGateway, saveHermesConfig } from '@/hermes'
+import { getWingConfigRecord, type WingGateway, saveWingConfig } from '@/wing'
 import { useI18n } from '@/i18n'
 import { Wrench } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeSessionId } from '@/store/session'
-import type { HermesConfigRecord } from '@/types/hermes'
+import type { WingConfigRecord } from '@/types/wing'
 
 import { EmptyState, LoadingState, Pill, SettingsContent } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
 interface McpSettingsProps {
-  gateway?: HermesGateway | null
+  gateway?: WingGateway | null
   onConfigSaved?: () => void
 }
 
@@ -28,7 +28,7 @@ const EMPTY_SERVER = {
   env: {}
 }
 
-function getServers(config: HermesConfigRecord | null): McpServers {
+function getServers(config: WingConfigRecord | null): McpServers {
   const raw = config?.mcp_servers
 
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as McpServers) : {}
@@ -47,7 +47,7 @@ export function McpSettings({ gateway, onConfigSaved }: McpSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.mcp
   const activeSessionId = useStore($activeSessionId)
-  const [config, setConfig] = useState<HermesConfigRecord | null>(null)
+  const [config, setConfig] = useState<WingConfigRecord | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [body, setBody] = useState('')
@@ -57,7 +57,7 @@ export function McpSettings({ gateway, onConfigSaved }: McpSettingsProps) {
   useEffect(() => {
     let cancelled = false
 
-    getHermesConfigRecord()
+    getWingConfigRecord()
       .then(next => {
         if (cancelled) {
           return
@@ -131,7 +131,7 @@ export function McpSettings({ gateway, onConfigSaved }: McpSettingsProps) {
       nextServers[nextName] = parsed
 
       const nextConfig = { ...config, mcp_servers: nextServers }
-      await saveHermesConfig(nextConfig)
+      await saveWingConfig(nextConfig)
       setConfig(nextConfig)
       setSelected(nextName)
       onConfigSaved?.()
@@ -151,7 +151,7 @@ export function McpSettings({ gateway, onConfigSaved }: McpSettingsProps) {
       delete nextServers[serverName]
 
       const nextConfig = { ...config, mcp_servers: nextServers }
-      await saveHermesConfig(nextConfig)
+      await saveWingConfig(nextConfig)
       setConfig(nextConfig)
       setSelected(Object.keys(nextServers).sort()[0] ?? null)
       onConfigSaved?.()

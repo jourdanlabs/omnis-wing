@@ -5,7 +5,7 @@
 **Date:** 2026-08-07  
 **Verdict:** `READY_FOR_GATE` (never self-CLEAR)  
 **Scope:** production signer wiring + private ledger + agent-flag non-trust on the WING fork  
-**Not:** full TERMINUS ABSOLUTE · not live Hermes cutover · no Keychain mutation in this gate
+**Not:** full TERMINUS ABSOLUTE · not live WING cutover · no Keychain mutation in this gate
 
 ## Pins (exact — do not collapse)
 
@@ -17,7 +17,7 @@
 | **HOLD repair code** | `443fc610094d1c09047e65afd39ef079c80da35d` |
 | **Branch HEAD at gate** | run `git -C ~/projects/omnis-wing rev-parse HEAD` (docs-only commits may sit atop 443fc) |
 | Prior completion CLEAR | `b25eecbea7e0b45bcecc69d6ee8ce69ebe8f4399` |
-| Live Hermes (untouched) | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` |
+| Live WING (untouched) | `2213ea9fa73ab06cf667c1bfb1e99c8de3541589` |
 | Captain Keychain tag | `ai.jourdanlabs.omnis-wing.terminus.r4` |
 
 Do **not** call the implementation commit the handoff tip, or the handoff tip the implementation.
@@ -98,12 +98,12 @@ Production chat (after enroll + config copy):
 ```bash
 export OMNIS_WING_PRODUCTION_CONFIG=/path/to/production.yaml
 export OMNIS_WING_SIGNER_MODE=production
-./scripts/hermes-wing-prod chat
+./scripts/wing-prod chat
 ```
 
 ## Non-claims
 
-- Live `~/.hermes/hermes-agent` not modified
+- Live `~/.omnis-wing/omnis-wing` not modified
 - No live provider in cold suite
 - No Keychain enroll/delete/rotate/export by builder
 - Not full TERMINUS ABSOLUTE / whole-tree / Chinese-model safety cert

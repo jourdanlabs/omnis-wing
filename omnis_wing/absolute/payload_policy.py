@@ -18,7 +18,7 @@ from omnis_wing.absolute.source_taint import classify_content_bytes, merge_taint
 # Content signals — NOT workspace directory names as sole authority
 _PROJECT_PATH_RE = re.compile(
     rb"(?i)(?:/Users/|/home/|\\\\|chamber|jourdanlabs|omnis-wing|pan-cc|"
-    rb"projects/omnis|SOUL\.md|MEMORY\.md|\.hermes/profiles)"
+    rb"projects/omnis|SOUL\.md|MEMORY\.md|\.omnis-wing/profiles)"
 )
 _SOURCE_CODE_RE = re.compile(
     rb"(?i)(?:def |class |import |from \w+ import |function |const |let |var |"

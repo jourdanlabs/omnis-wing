@@ -4,7 +4,7 @@
 
 Gate candidate: `89ccebae7922cab0645ecb4e8d145eb5d8a469c5`  
 Cleared: production signer + verifier/health on selected ordinary non-stream chat path only.  
-`UNVERIFIED_AT_READ` must not become hardware attestation. Not live Hermes / streaming / remote anchor / whole-tree / full ABSOLUTE.
+`UNVERIFIED_AT_READ` must not become hardware attestation. Not live WING / streaming / remote anchor / whole-tree / full ABSOLUTE.
 
 Builder: Videl  
 Prior HOLD: `dccf6c4ce2be2a001e67db1091b817fcc0b5c731`  
@@ -34,7 +34,7 @@ Builder: **58 OK + 1 skipped** (default cold); Keychain IT **OK** when opted in.
 
 ## Non-claims
 
-Unchanged from R4. `UNVERIFIED_AT_READ` honesty preserved. Captain key not rotated/exported. Live Hermes untouched. Not full ABSOLUTE.
+Unchanged from R4. `UNVERIFIED_AT_READ` honesty preserved. Captain key not rotated/exported. Live WING untouched. Not full ABSOLUTE.
 
 **READY_FOR_GATE**
 

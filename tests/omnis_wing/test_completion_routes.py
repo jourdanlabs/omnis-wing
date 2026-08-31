@@ -16,7 +16,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-os.environ["HERMES_HOME"] = tempfile.mkdtemp(prefix="wing-comp-home-")
+os.environ["WING_HOME"] = tempfile.mkdtemp(prefix="wing-comp-home-")
 os.environ["OMNIS_WING_LEDGER_DIR"] = tempfile.mkdtemp(prefix="wing-comp-led-")
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
@@ -32,7 +32,7 @@ from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
 bootstrap_wing_test_env()
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.auto_provenance import auto_wing_context, ensure_agent_wing_context  # noqa: E402
 from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.completion.product_disable import load_manifest, WingRouteDisabled  # noqa: E402

@@ -4,12 +4,12 @@
   "coverage_class": "AI_EGRESS_GOVERNED_R5_R7_SELECTED_FORK",
   "claims_whole_tree_ai_egress": false,
   "claims_absolute_complete": false,
-  "claims_all_hermes_chat_paths": false,
+  "claims_all_wing_chat_paths": false,
   "glass": {
     "active_boundary": "AI EGRESS GOVERNED (R5 payload policy + R6 primary joins + R7 coverage) on WING fork",
     "also_true": [
       "NOT full TERMINUS ABSOLUTE",
-      "NOT live Hermes cutover",
+      "NOT live WING cutover",
       "Protected material must be refused / local / REDACT \u2014 never silent CN forward",
       "Outside-fork workstation/IDE egress not governed"
     ]
@@ -53,7 +53,7 @@
   ],
   "governed_r2": [
     {
-      "path": "omnis_wing/absolute/hermes_chat_join.py",
+      "path": "omnis_wing/absolute/wing_chat_join.py",
       "status": "governed_r2",
       "role": "R2 sole join: messages \u2192 OutboundEnvelope \u2192 dispatch_outbound \u2192 client.create"
     },
@@ -63,7 +63,7 @@
       "role": "interruptible_api_call non-stream chat_completions branch uses governed join only"
     }
   ],
-  "inherited_hermes_transport": [
+  "inherited_wing_transport": [
     {
       "path_glob": "agent/**/*.py",
       "status": "outside_r2",
@@ -90,7 +90,7 @@
       "note": "Gateway inbound; not R2 outbound AI broker."
     },
     {
-      "path_glob": "hermes_cli/**/*.py",
+      "path_glob": "wing_cli/**/*.py",
       "status": "outside_r2",
       "note": "CLI/auth utilities; not claimed."
     }
@@ -112,7 +112,7 @@
       "HTTP/TLS framing and auth headers",
       "streaming / anthropic / bedrock / codex paths",
       "retries/fallbacks as separate paths",
-      "whole Hermes tree"
+      "whole WING tree"
     ]
   },
   "governed_r3": [

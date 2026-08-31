@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 _tmp = tempfile.mkdtemp(prefix="wing-p0-")
-os.environ["HERMES_HOME"] = _tmp
+os.environ["WING_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = tempfile.mkdtemp(prefix="wing-p0-led-")
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
 os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
@@ -35,7 +35,7 @@ from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
 bootstrap_wing_test_env()
 
 from omnis_wing.absolute.auto_provenance import resolve_evidence_session  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.receipt_spine import UnavailableSigner, Ed25519TestSigner  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 from omnis_wing.completion.product_disable import WingRouteDisabled, load_manifest  # noqa: E402
@@ -292,7 +292,7 @@ class CompletionP0RepairTests(unittest.TestCase):
             f"""
             import os, sys, tempfile, importlib
             sys.path.insert(0, {str(ROOT)!r})
-            os.environ['HERMES_HOME'] = {tempfile.mkdtemp()!r}
+            os.environ['WING_HOME'] = {tempfile.mkdtemp()!r}
             os.environ['OMNIS_WING_LEDGER_DIR'] = {tempfile.mkdtemp()!r}
             # no httpx stubs
             from omnis_wing.completion.side_doors import ensure_side_doors_armed, ROUTE_MODULES, MODULE_HANDLER_TARGETS
@@ -363,7 +363,7 @@ class CompletionP0RepairTests(unittest.TestCase):
             f"""
             import os, sys, tempfile
             sys.path.insert(0, {str(ROOT)!r})
-            os.environ['HERMES_HOME'] = {tempfile.mkdtemp()!r}
+            os.environ['WING_HOME'] = {tempfile.mkdtemp()!r}
             from omnis_wing.completion import side_doors as sd
             sd.ensure_side_doors_armed()
             sd.force_unresolved_for_test('tools.tts_tool')

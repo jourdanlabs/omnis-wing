@@ -4,7 +4,7 @@
   "schema": "OmnisSurfaceVerifyReceiptV1",
   "surface": "WING-MOBILE",
   "repo": "/Users/sokpyeon/projects/omnis-wing",
-  "plan": "WING Mobile V1 — offline health paste shell for Hermes transport",
+  "plan": "WING Mobile V1 — offline health paste shell for WING transport",
   "status": "complete",
   "items": [
     {

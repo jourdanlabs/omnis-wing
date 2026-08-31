@@ -23,7 +23,7 @@ from .config import (
 
 
 def _runtime_dir() -> Path:
-    home = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    home = Path(os.environ.get("WING_HOME") or (Path.home() / ".omnis-wing"))
     path = home / "omnis-wing-runtime"
     path.mkdir(mode=0o700, parents=True, exist_ok=True)
     if path.is_symlink() or (path.stat().st_mode & 0o077):

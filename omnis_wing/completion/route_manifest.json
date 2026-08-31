@@ -253,8 +253,8 @@
       "disable_reason": "Video gen disabled until governed"
     },
     {
-      "route_id": "hermes_cli.goals_kanban_profile",
-      "source": "hermes_cli/goals.py+kanban_*.py+profile_describer.py",
+      "route_id": "wing_cli.goals_kanban_profile",
+      "source": "wing_cli/goals.py+kanban_*.py+profile_describer.py",
       "modality": "chat",
       "client": "openai_compatible",
       "broker_join": "DISABLED",
@@ -306,7 +306,7 @@
     },
     {
       "route_id": "health.provider_probe_no_user_payload",
-      "source": "hermes_cli/doctor.py+status.py",
+      "source": "wing_cli/doctor.py+status.py",
       "modality": "health_probe",
       "client": "httpx",
       "broker_join": "dogfood_launcher_local_health_only",

@@ -1,7 +1,7 @@
 """OMNIS WING product distribution: package, install, operator bundle, matrix.
 
 This package owns the reproducible install path for the WING dogfood product.
-It never calls a live provider and never mutates live Hermes profiles.
+It never calls a live provider and never mutates live WING profiles.
 """
 
 from __future__ import annotations

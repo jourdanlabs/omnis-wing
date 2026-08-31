@@ -1,6 +1,6 @@
 """FULL CADMUS residual zero-tolerance matrix — post P0 CLEAR (dfef719c2d).
 
-No live provider. No Keychain. No live Hermes mutation.
+No live provider. No Keychain. No live WING mutation.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 _tmp = tempfile.mkdtemp(prefix="wing-full-cadmus-")
-os.environ["HERMES_HOME"] = _tmp
+os.environ["WING_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "led")
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
@@ -37,7 +37,7 @@ from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
 bootstrap_wing_test_env()
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.absolute.redirect_guard import (  # noqa: E402
@@ -302,7 +302,7 @@ class FullCadmusZT(unittest.TestCase):
 
     def test_zt02d_image_fake_client_canonical_bytes_once(self):
         """Fake client's image method is the only invoke; receives exact envelope bytes once."""
-        from omnis_wing.absolute.hermes_chat_join import stable_json_bytes
+        from omnis_wing.absolute.wing_chat_join import stable_json_bytes
         from omnis_wing.absolute.image_join import canonical_image_body
 
         client = FakeClient()

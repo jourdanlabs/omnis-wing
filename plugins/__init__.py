@@ -1,1 +1,1 @@
-# Hermes plugins package
+# WING plugins package

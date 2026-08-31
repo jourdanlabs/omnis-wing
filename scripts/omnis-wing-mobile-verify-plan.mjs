@@ -83,7 +83,7 @@ const report = {
 	schema: 'OmnisSurfaceVerifyReceiptV1',
 	surface: 'WING-MOBILE',
 	repo: ROOT,
-	plan: 'WING Mobile V1 — offline health paste shell for Hermes transport',
+	plan: 'WING Mobile V1 — offline health paste shell for WING transport',
 	status: allOk ? 'complete' : 'in-progress',
 	items,
 	manual: [

@@ -7,7 +7,7 @@ destination; evidence is independently verifiable and secret-free.
 
 **This is a WING-only completion contract.** It does not claim protection over
 the IDE, terminal, browser, Git, third-party extensions, the whole workstation,
-or the untouched live Hermes install until a separately evidenced boundary
+or the untouched live WING install until a separately evidenced boundary
 covers each of those.
 
 **Builder:** Videl  
@@ -16,7 +16,7 @@ covers each of those.
 **Supersedes as a build brief:** `BULMA-VIDEL-WING-ABSOLUTE-FINISH-BBB-2026-08-07.md`  
 **Starting implementation:** R5–R7 `b5a668f52c3c6462204560d2262f937768cc3b12`  
 **Starting branch head:** `8b65e15eafa9ac1152c0eb450a293a071e1d5479`  
-**Live Hermes:** `~/.hermes/hermes-agent@2213ea9…` — immutable during build.
+**Live WING:** `~/.omnis-wing/omnis-wing@2213ea9…` — immutable during build.
 
 ---
 
@@ -47,7 +47,7 @@ The final release may say only:
 > produces independently verifiable secret-free evidence of what was
 > authorized, refused, attempted, and completed.
 
-It may not say “all workstation traffic,” “all Hermes traffic,” “safe to send
+It may not say “all workstation traffic,” “all WING traffic,” “safe to send
 raw protected code to Chinese models,” “hardware attested” without attestation,
 or “anchored” without a working external anchor.
 
@@ -245,7 +245,7 @@ access or a misleading calm UI.
 
 **Build**
 
-1. Leave dirty live Hermes untouched. Produce a clean pinned deployment target
+1. Leave dirty live WING untouched. Produce a clean pinned deployment target
    and explicit production config/install/attach path.
 2. Require startup preflight: signed policy valid, production signer available,
    private ledger valid, coverage manifest complete, and required anchor state.
@@ -304,7 +304,7 @@ boundary, or missing independent gate.
 
 ## 4. Builder operating rules
 
-- Work only in `~/projects/omnis-wing`; do not touch `~/.hermes/hermes-agent`.
+- Work only in `~/projects/omnis-wing`; do not touch `~/.omnis-wing/omnis-wing`.
 - Do not push/publish/package, mutate Keychain, or make live provider calls.
 - Do not weaken tests, exclude routes, or turn routes into `DISABLED` to claim
   completion.

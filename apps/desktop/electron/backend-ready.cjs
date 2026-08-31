@@ -1,7 +1,7 @@
-const _READY_RE = /^HERMES_DASHBOARD_READY port=(\d+)/m
+const _READY_RE = /^WING_DASHBOARD_READY port=(\d+)/m
 
 /**
- * Watch a child process's stdout for the `HERMES_DASHBOARD_READY port=<N>`
+ * Watch a child process's stdout for the `WING_DASHBOARD_READY port=<N>`
  * line that web_server.py prints after uvicorn binds its socket.
  *
  * Returns the parsed port. Rejects if:
@@ -44,7 +44,7 @@ function waitForDashboardPort(child, timeoutMs = 45_000) {
 
     function onExit(code, signal) {
       cleanup()
-      reject(new Error(`Hermes backend: exited before port announcement (${signal || code})`))
+      reject(new Error(`WING backend: exited before port announcement (${signal || code})`))
     }
 
     function onError(err) {
@@ -54,7 +54,7 @@ function waitForDashboardPort(child, timeoutMs = 45_000) {
 
     const timer = setTimeout(() => {
       cleanup()
-      reject(new Error(`Timed out waiting for Hermes backend port announcement (${timeoutMs}ms)`))
+      reject(new Error(`Timed out waiting for WING backend port announcement (${timeoutMs}ms)`))
     }, timeoutMs)
 
     child.stdout.on('data', onData)

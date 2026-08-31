@@ -18,7 +18,7 @@ from typing import Any, Callable, Optional
 from omnis_wing.absolute.auto_provenance import ensure_agent_wing_context
 from omnis_wing.absolute.envelope import IntendedDestination, OutboundEnvelope
 from omnis_wing.absolute.evaluator import Authorization, evaluate_decision
-from omnis_wing.absolute.hermes_chat_join import (
+from omnis_wing.absolute.wing_chat_join import (
     ALLOWED_BODY_KEYS,
     HOSTNAME_POLICY,
     PATH_CLASS,

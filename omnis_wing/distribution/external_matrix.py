@@ -8,7 +8,7 @@ Proves, without live credentials:
 4. hostile provider response → suppressed (no success delivery)
 
 Requires a clean CADUCEUS assembly at the frozen pin with ``npm ci`` already
-run, and an isolated profile directory. Never touches live Hermes.
+run, and an isolated profile directory. Never touches live WING.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from typing import Any, Optional
 from urllib.parse import urlparse
 
 from omnis_wing.absolute.envelope import SourceProvenance
-from omnis_wing.absolute.hermes_chat_join import (
+from omnis_wing.absolute.wing_chat_join import (
     EvidenceSession,
     WingEgressContext,
     WingRefusal,

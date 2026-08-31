@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { cleanup, render, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getGlobalModelInfo } from '@/hermes'
+import { getGlobalModelInfo } from '@/wing'
 import {
   $activeSessionId,
   $currentModel,
@@ -16,7 +16,7 @@ import { useModelControls } from './use-model-controls'
 const setGlobalModel = vi.fn()
 const notifyError = vi.fn()
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/wing', () => ({
   getGlobalModelInfo: vi.fn(),
   setGlobalModel: (...args: Parameters<typeof setGlobalModel>) => setGlobalModel(...args)
 }))

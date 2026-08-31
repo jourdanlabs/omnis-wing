@@ -12,7 +12,7 @@ from omnis_wing.chamber_memory import (
     load_chamber_memory,
     resolve_chamber_vault,
 )
-from omnis_wing.sealed_soul import PAN_SOUL_ID, stage_pan_soul_for_hermes
+from omnis_wing.sealed_soul import PAN_SOUL_ID, stage_pan_soul_for_wing
 
 MTS_SOULS = Path.home() / "projects" / "mts" / "souls"
 
@@ -59,7 +59,7 @@ class TestChamberMemory(unittest.TestCase):
             (vault / "memory" / "MEMORY.md").write_text("fact: wing memory bridge\n", encoding="utf-8")
             (vault / "sessions").mkdir()
             profile = Path(tmp) / "pan-wing"
-            loaded = stage_pan_soul_for_hermes(profile, MTS_SOULS, vault_dir=vault)
+            loaded = stage_pan_soul_for_wing(profile, MTS_SOULS, vault_dir=vault)
             soul = (profile / "SOUL.md").read_text(encoding="utf-8")
             mem = (profile / "MEMORY.md").read_text(encoding="utf-8")
             self.assertIn("PannyWanny", soul)
@@ -76,7 +76,7 @@ class TestChamberMemory(unittest.TestCase):
             self.skipTest("sealed Pan missing")
         with tempfile.TemporaryDirectory() as tmp:
             profile = Path(tmp) / "pan-wing"
-            stage_pan_soul_for_hermes(profile, MTS_SOULS, vault_dir=Path(tmp) / "nope")
+            stage_pan_soul_for_wing(profile, MTS_SOULS, vault_dir=Path(tmp) / "nope")
             soul = (profile / "SOUL.md").read_text(encoding="utf-8")
             self.assertIn("PannyWanny", soul)
             marker = json.loads((profile / ".omnis-wing-pan-sealed").read_text(encoding="utf-8"))
@@ -96,7 +96,7 @@ class TestChamberMemory(unittest.TestCase):
             self.skipTest("MEMORY.md empty")
         with tempfile.TemporaryDirectory() as tmp:
             profile = Path(tmp) / "pan-wing"
-            stage_pan_soul_for_hermes(profile, MTS_SOULS, vault_dir=live)
+            stage_pan_soul_for_wing(profile, MTS_SOULS, vault_dir=live)
             soul = (profile / "SOUL.md").read_text(encoding="utf-8")
             staged = (profile / "MEMORY.md").read_text(encoding="utf-8")
             self.assertIn("PannyWanny", soul)

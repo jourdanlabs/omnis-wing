@@ -3,7 +3,7 @@
 **Authority:** Captain’s instruction: *finish WING; do not stop after a leg.*  
 **Start pin:** `omnis-wing@89ccebae7922cab0645ecb4e8d145eb5d8a469c5`  
 **Existing spine:** R4.1 is clear for ordinary non-stream `chat.completions`, including explicit Keychain enrollment, P-256/Ed25519 algorithm-bound receipts, local fsync, and offline health.  
-**Builder:** Videl · **Independent gate:** Bulma · **Do not push or touch live Hermes.**
+**Builder:** Videl · **Independent gate:** Bulma · **Do not push or touch live WING.**
 
 ## Captain outcome
 
@@ -118,7 +118,7 @@ It must tell Captain what is active, what is disabled, which routes are governed
 ## Safety and workspace boundaries
 
 - Work in `~/projects/omnis-wing` only; commit locally as you close cohesive units, but do not push.
-- Do not modify, stop, start, or reconfigure `~/.hermes/hermes-agent`; it remains the untouched upstream/live instance.
+- Do not modify, stop, start, or reconfigure `~/.omnis-wing/omnis-wing`; it remains the untouched upstream/live instance.
 - Do not inspect, copy, print, or transmit API keys, OAuth tokens, session data, browser data, project content, or private Keychain material.
 - Do not call live model providers during this build. Fake endpoints and harmless test fixtures only. Live model onboarding is an explicit Captain action after the completed candidate is independently gated.
 - Do not retro-sign old ledger history or call old unsigned rows signed.

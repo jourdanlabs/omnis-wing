@@ -73,7 +73,7 @@ class OperatorRunbookTests(unittest.TestCase):
         self.home = self.root / "profile"
         self.home.mkdir(mode=0o700)
         self.old_env = dict(os.environ)
-        os.environ["HERMES_HOME"] = str(self.home)
+        os.environ["WING_HOME"] = str(self.home)
         os.environ["OMNIS_WING_PROFILE_HOME"] = str(self.home)
         os.environ["CADUCEUS_STATE_DIR"] = str(self.home / "caduceus-state")
         os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
@@ -446,29 +446,29 @@ class OperatorRunbookTests(unittest.TestCase):
         ):
             runbook._config_digest("env", "production")
 
-    def test_default_live_hermes_home_is_refused(self) -> None:
-        live = Path.home() / ".hermes"
-        os.environ["HERMES_HOME"] = str(live)
+    def test_default_live_wing_home_is_refused(self) -> None:
+        live = Path.home() / ".omnis-wing"
+        os.environ["WING_HOME"] = str(live)
         os.environ["OMNIS_WING_PROFILE_HOME"] = str(live)
-        with self.assertRaisesRegex(RuntimeError, "live_default_hermes_home_refused"):
+        with self.assertRaisesRegex(RuntimeError, "live_default_wing_home_refused"):
             runbook._require_isolated_profile()
 
-    def test_equivalent_live_hermes_dotdot_alias_is_refused_before_preparation(self) -> None:
-        live_alias = Path.home() / ".hermes" / ".." / ".hermes"
-        os.environ["HERMES_HOME"] = str(live_alias)
+    def test_equivalent_live_wing_dotdot_alias_is_refused_before_preparation(self) -> None:
+        live_alias = Path.home() / ".omnis-wing" / ".." / ".omnis-wing"
+        os.environ["WING_HOME"] = str(live_alias)
         os.environ["OMNIS_WING_PROFILE_HOME"] = str(live_alias)
         with (
             patch.object(runbook, "mkdir_private_tree") as mkdir,
             patch.object(runbook, "inspect_controlled_dir") as inspect,
         ):
-            with self.assertRaisesRegex(RuntimeError, "live_default_hermes_home_refused"):
+            with self.assertRaisesRegex(RuntimeError, "live_default_wing_home_refused"):
                 runbook._require_isolated_profile()
         mkdir.assert_not_called()
         inspect.assert_not_called()
 
     def test_stop_command_refuses_equivalent_live_alias_before_launcher(self) -> None:
-        live_alias = Path.home() / ".hermes" / ".." / ".hermes"
-        os.environ["HERMES_HOME"] = str(live_alias)
+        live_alias = Path.home() / ".omnis-wing" / ".." / ".omnis-wing"
+        os.environ["WING_HOME"] = str(live_alias)
         os.environ["OMNIS_WING_PROFILE_HOME"] = str(live_alias)
         with patch.object(launcher, "stop_owned_service") as stop:
             self.assertEqual(runbook.main(["stop"]), 2)

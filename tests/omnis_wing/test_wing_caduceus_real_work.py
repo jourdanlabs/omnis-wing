@@ -22,7 +22,7 @@ from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
 bootstrap_wing_test_env()
 
 from omnis_wing.absolute.envelope import SourceProvenance  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import (  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import (  # noqa: E402
     EvidenceSession,
     OutcomeUnknownError,
     WingEgressContext,
@@ -274,7 +274,7 @@ class FakeCaduceusHttp:
 
 
 class RealPathAgent:
-    """Small host fixture that executes Hermes's actual interruptible seam."""
+    """Small host fixture that executes WING's actual interruptible seam."""
 
     api_mode = "chat_completions"
     provider = "minimax"
@@ -620,7 +620,7 @@ class WingCaduceusRealWorkTests(unittest.TestCase):
         self.assertEqual(chunks[0].choices[0].delta.content, "useful minimax-like answer")
         self.assertEqual(len(self.fake.provider_bodies), 1)
 
-    def test_actual_hermes_host_seam_uses_caduceus_and_no_direct_client(self) -> None:
+    def test_actual_wing_host_seam_uses_caduceus_and_no_direct_client(self) -> None:
         # Plant a stale caller-owned generic context. The real host seam must
         # rebuild provenance from this turn's final body and cannot trust it.
         stale_generic = WingEgressContext(

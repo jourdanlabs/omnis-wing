@@ -2,7 +2,7 @@
 # Isolated OMNIS WING operator workflow. Never enrolls keys or calls a provider.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-VENV_PY="${OMNIS_WING_VENV_PY:-$HOME/.hermes/hermes-agent/venv/bin/python}"
+VENV_PY="${OMNIS_WING_VENV_PY:-$HOME/.omnis-wing/omnis-wing/venv/bin/python}"
 if [[ ! -x "$VENV_PY" ]]; then
   echo "[omnis-wing-operator] missing Python runtime: $VENV_PY" >&2
   exit 127

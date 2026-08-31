@@ -16,7 +16,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 _tmp = tempfile.mkdtemp(prefix="wing-m17-")
-os.environ["HERMES_HOME"] = _tmp
+os.environ["WING_HOME"] = _tmp
 os.environ["OMNIS_WING_LEDGER_DIR"] = str(Path(_tmp) / "led")
 os.environ["OMNIS_WING_SIGNER_MODE"] = "test"
 os.environ.pop("OMNIS_WING_FORCE_CLASSIFICATION", None)
@@ -34,7 +34,7 @@ from tests.omnis_wing._fixtures import bootstrap_wing_test_env  # noqa: E402
 bootstrap_wing_test_env()
 
 from agent.chat_completion_helpers import interruptible_api_call  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import WingRefusal  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import WingRefusal  # noqa: E402
 from omnis_wing.absolute.source_taint import (  # noqa: E402
     classify_content_bytes,
     merge_taint,
@@ -51,7 +51,7 @@ from omnis_wing.absolute.preflight import run_preflight  # noqa: E402
 from omnis_wing.absolute.transport_broker import get_broker  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 from omnis_wing.absolute.receipt_spine import make_test_signer, EvidenceLedger  # noqa: E402
-from omnis_wing.absolute.hermes_chat_join import EvidenceSession, WingEgressContext  # noqa: E402
+from omnis_wing.absolute.wing_chat_join import EvidenceSession, WingEgressContext  # noqa: E402
 from omnis_wing.completion.product_disable import load_manifest  # noqa: E402
 
 CADMUS = ROOT / "omnis_wing/spec/omnis-wing-m1-m7-terminus-absolute.cadmus-input.json"

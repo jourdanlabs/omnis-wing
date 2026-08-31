@@ -1,7 +1,7 @@
 """Zero-tolerance frozen budgets — benign corpus refusal + scanner latency.
 
 Declared frozen numbers for the FULL CADMUS residual pass. Not production SLOs
-for live Hermes; cold offline budgets for the WING fork proving suite.
+for live WING; cold offline budgets for the WING fork proving suite.
 """
 
 from __future__ import annotations

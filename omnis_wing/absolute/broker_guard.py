@@ -38,7 +38,7 @@ BANNED_ALL_NAMES = BANNED_GOVERNED_NAMES | BANNED_SCOPE_NAMES
 ALLOWED_GOVERNED_MODULES = frozenset(
     {
         "omnis_wing.absolute.transport_broker",
-        "omnis_wing.absolute.hermes_chat_join",
+        "omnis_wing.absolute.wing_chat_join",
         "omnis_wing.absolute.universal_egress",
         "omnis_wing.absolute.image_join",
         "omnis_wing.absolute.broker_guard",
@@ -49,7 +49,7 @@ ALLOWED_GOVERNED_MODULES = frozenset(
 # Paths (relative to repo root) that may contain governed names.
 ALLOWED_PATH_PREFIXES = (
     "omnis_wing/absolute/transport_broker.py",
-    "omnis_wing/absolute/hermes_chat_join.py",
+    "omnis_wing/absolute/wing_chat_join.py",
     "omnis_wing/absolute/universal_egress.py",
     "omnis_wing/absolute/image_join.py",
     "omnis_wing/absolute/broker_guard.py",
@@ -63,7 +63,7 @@ ALLOWED_PATH_PREFIXES = (
 AGENT_SCAN_GLOBS = (
     "agent/**/*.py",
     "tools/**/*.py",
-    "hermes_cli/**/*.py",
+    "wing_cli/**/*.py",
     "gateway/**/*.py",
     "plugins/**/*.py",
     "cron/**/*.py",
@@ -81,7 +81,7 @@ _TRANSMIT_METHODS = frozenset(
 )
 
 _BANNED_MODULE_FRAGMENTS = (
-    "hermes_chat_join",
+    "wing_chat_join",
     "universal_egress",
     "broker_guard",
     "image_join",
@@ -306,11 +306,11 @@ def scan_ast_agent_imports(root: Path) -> List[Tuple[str, int, str]]:
                     if (
                         mod
                         in (
-                            "omnis_wing.absolute.hermes_chat_join",
+                            "omnis_wing.absolute.wing_chat_join",
                             "omnis_wing.absolute.universal_egress",
                             "omnis_wing.absolute.broker_guard",
                         )
-                        or mod.endswith(".hermes_chat_join")
+                        or mod.endswith(".wing_chat_join")
                         or mod.endswith(".universal_egress")
                         or mod.endswith(".broker_guard")
                     ):
@@ -327,9 +327,9 @@ def scan_ast_agent_imports(root: Path) -> List[Tuple[str, int, str]]:
                                         f"from {mod} import {alias.name}",
                                     )
                                 )
-                            # Any import from hermes_chat_join / universal_egress is suspect
+                            # Any import from wing_chat_join / universal_egress is suspect
                             # if the name is a governed helper or star.
-                            if mod.endswith("hermes_chat_join") or mod.endswith(
+                            if mod.endswith("wing_chat_join") or mod.endswith(
                                 "universal_egress"
                             ):
                                 if alias.name in BANNED_GOVERNED_NAMES or alias.name == "*":
@@ -388,7 +388,7 @@ def scan_ast_dynamic_bypass(root: Path) -> List[Tuple[str, int, str]]:
 
             # 1) String constants that name or assemble banned symbols/modules.
             for target in list(BANNED_ALL_NAMES) + [
-                "omnis_wing.absolute.hermes_chat_join",
+                "omnis_wing.absolute.wing_chat_join",
                 "omnis_wing.absolute.universal_egress",
                 "omnis_wing.absolute.broker_guard",
             ]:

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# OMNIS WING cutover dry-run — Path A. Does NOT modify ~/.hermes/hermes-agent.
+# OMNIS WING cutover dry-run — Path A. Does NOT modify ~/.omnis-wing/omnis-wing.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-LIVE_AGENT="${HERMES_LIVE_AGENT:-$HOME/.hermes/hermes-agent}"
-DOGFOOD_HOME="${OMNIS_WING_DOGFOOD_HOME:-$HOME/.hermes/omnis-wing-dogfood}"
+LIVE_AGENT="${WING_LIVE_AGENT:-$HOME/.omnis-wing/omnis-wing}"
+DOGFOOD_HOME="${OMNIS_WING_DOGFOOD_HOME:-$HOME/.omnis-wing/omnis-wing-dogfood}"
 LEDGER_DIR="$DOGFOOD_HOME/ledgers"
 STATE_DIR="$DOGFOOD_HOME/operator-state"
 mkdir -p "$DOGFOOD_HOME" "$LEDGER_DIR" "$STATE_DIR"
@@ -12,13 +12,13 @@ mkdir -p "$DOGFOOD_HOME" "$LEDGER_DIR" "$STATE_DIR"
 if command -v python3.11 >/dev/null 2>&1; then PY=python3.11
 elif command -v python3.12 >/dev/null 2>&1; then PY=python3.12
 else PY=python3; fi
-# Prefer live Hermes venv for import-heavy checks (deps present); suite still uses PY
+# Prefer live WING venv for import-heavy checks (deps present); suite still uses PY
 VENV_PY="$LIVE_AGENT/venv/bin/python"
 if [[ -x "$VENV_PY" ]]; then RUNTIME_PY="$VENV_PY"; else RUNTIME_PY="$PY"; fi
 
 export WING_ROOT="$ROOT"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
-export HERMES_HOME="$DOGFOOD_HOME"
+export WING_HOME="$DOGFOOD_HOME"
 export OMNIS_WING_LEDGER_DIR="$LEDGER_DIR"
 unset OMNIS_WING_SIGNER_MODE || true
 
@@ -52,7 +52,7 @@ os.environ.pop("OMNIS_WING_SIGNER_MODE", None)
 from omnis_wing.completion.side_doors import ensure_side_doors_armed
 from omnis_wing.absolute.auto_provenance import resolve_evidence_session
 from omnis_wing.absolute.receipt_spine import UnavailableSigner
-from omnis_wing.absolute.hermes_chat_join import WingRefusal
+from omnis_wing.absolute.wing_chat_join import WingRefusal
 from agent.chat_completion_helpers import interruptible_api_call
 
 st = ensure_side_doors_armed()
@@ -195,19 +195,19 @@ if [[ -d "$LIVE_AGENT/.git" ]]; then
   AFTER_STAT="$(git -C "$LIVE_AGENT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
   echo "live_HEAD_after=$AFTER porcelain_lines=$AFTER_STAT"
   if [[ "$BEFORE" != "$AFTER" ]]; then
-    echo "FAIL: live hermes-agent HEAD changed during dry-run" >&2
+    echo "FAIL: live omnis-wing HEAD changed during dry-run" >&2
     exit 1
   fi
   if [[ "$BEFORE_STAT" != "$AFTER_STAT" ]]; then
-    echo "FAIL: live hermes-agent porcelain changed during dry-run" >&2
+    echo "FAIL: live omnis-wing porcelain changed during dry-run" >&2
     exit 1
   fi
-  echo "LIVE_HERMES_UNTOUCHED_OK"
+  echo "LIVE_WING_UNTOUCHED_OK"
 fi
 
 # 8) CADUCEUS dogfood launcher is canonical (from wing-public-release-prep).
-#    This dry-run must not rewrite scripts/hermes-wing.
-LAUNCHER="$ROOT/scripts/hermes-wing"
+#    This dry-run must not rewrite scripts/wing-dogfood.
+LAUNCHER="$ROOT/scripts/wing-dogfood"
 if [[ ! -x "$LAUNCHER" ]]; then
   echo "FAIL: missing CADUCEUS dogfood launcher $LAUNCHER" >&2
   exit 1
