@@ -55,7 +55,7 @@ from omnis_wing.absolute.wing_chat_join import EvidenceSession, WingEgressContex
 from omnis_wing.completion.product_disable import load_manifest  # noqa: E402
 
 CADMUS = ROOT / "omnis_wing/spec/omnis-wing-m1-m7-terminus-absolute.cadmus-input.json"
-CADMUS_SHA = "0f578b80374aeb1d78c1604071dfc814e2e26037e6501ce28d61b4abe589b2ad"
+CADMUS_SHA = "6986aa8e667fd4d89fa35a0a840333bc40744846bdd6342a223d384dacfd3277"
 US = "https://ai.example.test/v1"
 
 

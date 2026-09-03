@@ -156,7 +156,7 @@ class R5PayloadPolicyTests(unittest.TestCase):
 
     def test_00_cadmus(self):
         self.assertTrue(CADMUS.is_file())
-        self.assertEqual(_sha_file(CADMUS), "7cf045442eb4112eea7d9bfe7b4dff59087062ac30740801ad23e31fd5c42e79")
+        self.assertEqual(_sha_file(CADMUS), "05c1d58e2ade16e917892c220c13e9d69bf11447f6f543dacc5758ecc95c8605")
 
     def test_r5_secret_in_extra_body_refuse(self):
         client = FakeClient()

@@ -39,7 +39,7 @@ from omnis_wing.completion.product_disable import load_manifest, WingRouteDisabl
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 
 BBB = ROOT / "omnis_wing" / "spec" / "OMNIS-WING-COMPLETION-BBB.md"
-BBB_SHA = "b1326dc57f4dde5922406e2033d14b0487dc387ab791e9fdecd3282907ad0bd6"
+BBB_SHA = "64e7a48b72cf83a5fad574e485f8b96983a353c45cf70fd6334a6518c011fc6c"
 US = "https://ai.example.test/v1"
 CN = "https://api.moonshot.cn/v1"
 

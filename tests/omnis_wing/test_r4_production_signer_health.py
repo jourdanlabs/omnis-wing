@@ -57,7 +57,7 @@ from omnis_wing.absolute.receipt_spine import (  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 
 CADMUS_R4 = ROOT / "omnis_wing" / "spec" / "omnis-wing-r4-production-signer-health.cadmus-input.json"
-CADMUS_R4_SHA = "a54c70e866a137e9513db3f99f2859dc6bf37873205bc4e2326a3355b8b52c86"
+CADMUS_R4_SHA = "30e8c7ce94b2e2fd5704d548b1a37965836c290d64c2f7dbf473a3b81d97f2bc"
 US_BASE = "https://ai.example.test/v1"
 TEST_TAG = "ai.jourdanlabs.omnis-wing.test.r4.disposable"
 

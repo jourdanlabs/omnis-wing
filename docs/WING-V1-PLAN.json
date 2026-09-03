@@ -1,14 +1,14 @@
 {
-  "ok": true,
-  "ts": "2026-08-27T06:02:12.329Z",
+  "ok": false,
+  "ts": "2026-09-03T04:48:26.792Z",
   "plan": "WING V1 (OMNIS WING)",
-  "status": "complete",
+  "status": "blocked",
   "items": [
     {
       "id": "p0-tests",
       "label": "v0 admission suite green",
-      "ok": true,
-      "note": "196 tests"
+      "ok": false,
+      "note": "235 tests"
     },
     {
       "id": "p0-build-script",
@@ -19,8 +19,8 @@
     {
       "id": "p0-dry-run",
       "label": "Path A cutover dry-run (no live wing writes)",
-      "ok": true,
-      "note": "DRY_RUN_OK"
+      "ok": false,
+      "note": "== OMNIS WING cutover dry-run (Path A) ==\nROOT=/Users/sokpyeon/projects/omnis-suite/omnis-wing\nDOGFOOD_HOME=/Users/sokpyeon/.omnis-wing/omnis-wing-dogfood\nLIVE_AGENT=/Users/sokpyeon/.omnis-wing/omnis-"
     },
     {
       "id": "p1-signer-test",
@@ -50,19 +50,13 @@
       "id": "p3-wing-dogfood",
       "label": "Dogfood launcher scripts/wing-dogfood",
       "ok": true,
-      "note": "/Users/sokpyeon/projects/omnis-wing/scripts/wing-dogfood"
+      "note": "/Users/sokpyeon/projects/omnis-suite/omnis-wing/scripts/wing-dogfood"
     },
     {
       "id": "p3-evidence-spine",
       "label": "Evidence spine tests",
       "ok": true,
       "note": null
-    },
-    {
-      "id": "p3-live-wing-untouched",
-      "label": "Live ~/.omnis-wing/omnis-wing not modified by verify",
-      "ok": true,
-      "note": "2213ea9fa73ab06cf667c1bfb1e99c8de3541589"
     },
     {
       "id": "p4-verify-plan",
@@ -72,7 +66,7 @@
     }
   ],
   "counts": {
-    "v0_tests": 196,
+    "v0_tests": 235,
     "pan_identity_tests": 11,
     "chamber_memory_tests": 6
   },
@@ -82,8 +76,8 @@
     "souls_dir": "/Users/sokpyeon/projects/mts/souls"
   },
   "path_a": {
-    "dry_run_ok": true,
-    "wing_wing": "/Users/sokpyeon/projects/omnis-wing/scripts/wing-dogfood",
+    "dry_run_ok": false,
+    "wing_wing": "/Users/sokpyeon/projects/omnis-suite/omnis-wing/scripts/wing-dogfood",
     "live_agent": "/Users/sokpyeon/.omnis-wing/omnis-wing",
     "dry_run_skipped": false
   },

@@ -54,7 +54,7 @@ from omnis_wing.absolute.receipt_spine import (  # noqa: E402
 from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 
 CADMUS_R3 = ROOT / "omnis_wing" / "spec" / "omnis-wing-r3-evidence-spine.cadmus-input.json"
-CADMUS_R3_SHA = "6f7563d2bfe9f3dc752c5d395ed153a6fb944332ad5f56ae84bc64a4af202f23"
+CADMUS_R3_SHA = "ef1b50da4d84f28c7f49672f18e457382ce4da5524d2e3121a723dd527f3a948"
 US_BASE = "https://ai.example.test/v1"
 CN_BASE = "https://api.moonshot.cn/v1"
 

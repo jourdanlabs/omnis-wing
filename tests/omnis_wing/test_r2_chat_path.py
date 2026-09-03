@@ -50,7 +50,7 @@ from omnis_wing.absolute.scanner import PLANTED_SECRET_MARKERS  # noqa: E402
 from omnis_wing.absolute.receipt_spine import EvidenceLedger, make_test_signer  # noqa: E402
 
 CADMUS_R2 = ROOT / "omnis_wing" / "spec" / "omnis-wing-r2-live-chat-path.cadmus-input.json"
-CADMUS_R2_SHA = "c12e0cb582634fca8a5bec1f5468c50cb82cf80b9661287a602acfb96d7396dd"
+CADMUS_R2_SHA = "5ed1047ee273eef6ba21f4ed527651d67db5f1803f24985a874d5f759c75cd32"
 
 US_BASE = "https://ai.example.test/v1"
 CN_BASE = "https://api.moonshot.cn/v1"

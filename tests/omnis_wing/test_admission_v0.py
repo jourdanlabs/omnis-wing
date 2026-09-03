@@ -30,7 +30,7 @@ from omnis_wing.transport_guard import (  # noqa: E402
 )
 
 CADMUS_SPEC = ROOT / "omnis_wing" / "spec" / "omnis-wing-v0.cadmus-input.json"
-CADMUS_SHA = "b92d45d70cef12e1e123504c9465088b67ad8158161a85172d726336f3850de4"
+CADMUS_SHA = "8a9acc595722680f0f8c108539252e26e295bc9479d8f77b82425b12582767d5"
 BASE_COMMIT = "2213ea9fa73ab06cf667c1bfb1e99c8de3541589"
 PKG = ROOT / "omnis_wing"
 

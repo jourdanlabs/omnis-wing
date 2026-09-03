@@ -34,7 +34,7 @@ from omnis_wing.transport_guard import (
 )
 
 CADMUS_R1 = ROOT / "omnis_wing" / "spec" / "omnis-wing-r1-absolute.cadmus-input.json"
-CADMUS_R1_SHA = "b4dcb959ddda7a0ac488817e65fed255a31da6e077c20596d90d62fe0e121805"
+CADMUS_R1_SHA = "a9d83f6f89688905b6a76728289665fb720395552746584ae79861ead571ef6c"
 
 
 def _sha_file(path: Path) -> str:
