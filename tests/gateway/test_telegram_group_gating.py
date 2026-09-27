@@ -636,10 +636,14 @@ def test_invalid_regex_patterns_are_ignored():
     assert adapter._should_process_message(_group_message("hello everyone")) is False
 
 
+# Config-loader fixtures exercise the real registry without installing unrelated
+# platform SDKs. Each temporary config explicitly disables lazy installation.
 def test_config_bridges_telegram_group_settings(monkeypatch, tmp_path):
     wing_home = tmp_path / ".omnis-wing"
     wing_home.mkdir()
     (wing_home / "config.yaml").write_text(
+        "security:\n"
+        "  allow_lazy_installs: false\n"
         "telegram:\n"
         "  require_mention: true\n"
         "  guest_mode: true\n"
@@ -695,6 +699,8 @@ def test_config_bridges_telegram_user_allowlists(monkeypatch, tmp_path):
     wing_home = tmp_path / ".omnis-wing"
     wing_home.mkdir()
     (wing_home / "config.yaml").write_text(
+        "security:\n"
+        "  allow_lazy_installs: false\n"
         "telegram:\n"
         "  allow_from:\n"
         "    - \"111\"\n"
@@ -723,6 +729,8 @@ def test_config_env_overrides_telegram_user_allowlists(monkeypatch, tmp_path):
     wing_home = tmp_path / ".omnis-wing"
     wing_home.mkdir()
     (wing_home / "config.yaml").write_text(
+        "security:\n"
+        "  allow_lazy_installs: false\n"
         "telegram:\n"
         "  allow_from: \"111\"\n"
         "  group_allow_from: \"222\"\n",
@@ -761,6 +769,8 @@ def test_top_level_require_mention_bridges_to_telegram(monkeypatch, tmp_path):
     wing_home.mkdir()
     # Intentionally no "telegram:" section — keys are at the top level.
     (wing_home / "config.yaml").write_text(
+        "security:\n"
+        "  allow_lazy_installs: false\n"
         "require_mention: true\n"
         "group_sessions_per_user: true\n",
         encoding="utf-8",
@@ -788,6 +798,8 @@ def test_top_level_require_mention_does_not_override_telegram_section(monkeypatc
     wing_home = tmp_path / ".omnis-wing"
     wing_home.mkdir()
     (wing_home / "config.yaml").write_text(
+        "security:\n"
+        "  allow_lazy_installs: false\n"
         "require_mention: true\n"
         "telegram:\n"
         "  require_mention: false\n",
@@ -808,6 +820,8 @@ def test_config_bridges_telegram_ignored_threads(monkeypatch, tmp_path):
     wing_home = tmp_path / ".omnis-wing"
     wing_home.mkdir()
     (wing_home / "config.yaml").write_text(
+        "security:\n"
+        "  allow_lazy_installs: false\n"
         "telegram:\n"
         "  ignored_threads:\n"
         "    - 31\n"

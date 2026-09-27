@@ -410,6 +410,11 @@ def _print_progress(
     ``subproc_wall`` is the actual subprocess wall-clock time (excluding
     queue-wait). When available, the display shows both the subprocess
     time and the queue-inclusive elapsed time.
+
+    The percentage measures finished file jobs, weighted by their collected
+    test counts. A timeout also finishes a job; it does not establish those
+    tests' outcomes. Keep that scheduling progress separate from the parsed
+    pass/fail counts.
     """
     status = "✓" if rc == 0 else "✗"
     pct = (tests_done / total_tests * 100) if total_tests else 0
@@ -440,14 +445,17 @@ def _print_progress(
         test_str = " ".join(parts) + ", " if parts else ""
     else:
         n_tests = test_counts.get(file, 0)
-        test_str = f"{n_tests} tests, " if n_tests else ""
+        test_str = f"{n_tests} collected, " if n_tests else ""
+        test_str += "outcomes unavailable, "
+    if rc == 124:
+        test_str += "timeout, "
     # Show subprocess time when available; fall back to queue-inclusive dur.
     if subproc_wall is not None:
         time_str = f"{subproc_wall:.1f}s"
     else:
         time_str = f"{dur:.1f}s"
     msg = (
-        f"[{pct:5.1f}% | {tests_done:>5}/{total_tests}"
+        f"[{pct:5.1f}% file-job progress | {tests_done:>5}/{total_tests} collected"
         f" | ✓{tests_passed:>{fw}} | ✗{tests_failed:>{fw}}] "
         f"{status} {_format_file(file, repo_root)} ({test_str}{time_str})"
     )
@@ -718,7 +726,8 @@ def main() -> int:
 
     # Capture and print on completion (out-of-order is fine — keeps the
     # terminal clean rather than interleaving N parallel pytest outputs).
-    failures: List[Tuple[Path, str, Dict[str, int]]] = []
+    failures: List[Tuple[Path, int, str, Dict[str, int]]] = []
+    unavailable_summaries: List[Path] = []
     file_times: List[Tuple[Path, float]] = []  # (file, subprocess_wall) for distribution
     started = time.monotonic()
     files_done = 0
@@ -727,6 +736,7 @@ def main() -> int:
     fail_count = 0
     tests_passed = 0
     tests_failed = 0
+    other_outcomes = {"errors": 0, "skipped": 0, "xfailed": 0, "xpassed": 0}
     lock = threading.Lock()
 
     def _on_done(file: Path, started_at: float, fut: "Future[Tuple[Path, int, str, dict[str, int], float]]") -> None:
@@ -739,7 +749,8 @@ def main() -> int:
                 files_done += 1
                 tests_done += n_tests
                 fail_count += 1
-                failures.append((file, f"runner crashed: {exc!r}", {}))
+                failures.append((file, 1, f"runner crashed: {exc!r}", {}))
+                unavailable_summaries.append(file)
                 _print_progress(
                     tests_done, total_tests, file, 1,
                     time.monotonic() - started_at,
@@ -754,12 +765,16 @@ def main() -> int:
             # Accumulate test-level counts from parsed summary.
             tests_passed += summary.get("passed", 0)
             tests_failed += summary.get("failed", 0)
+            for outcome in other_outcomes:
+                other_outcomes[outcome] += summary.get(outcome, 0)
+            if not summary:
+                unavailable_summaries.append(fpath)
             file_times.append((fpath, subproc_wall))
             if rc == 0:
                 pass_count += 1
             else:
                 fail_count += 1
-                failures.append((fpath, output, summary))
+                failures.append((fpath, rc, output, summary))
             _print_progress(
                 tests_done, total_tests, fpath, rc,
                 time.monotonic() - started_at,
@@ -788,8 +803,25 @@ def main() -> int:
 
     elapsed = time.monotonic() - started
     print()
-    pct = (tests_done / total_tests * 100) if total_tests else 0
-    print(f"=== Summary: {len(files)} files, {tests_passed} tests passed, {tests_failed} failed ({pct:.0f}% complete) in {elapsed:.1f}s ({args.jobs} workers) ===")
+    timeouts = sum(rc == 124 for _f, rc, _o, _s in failures)
+    print(
+        f"=== Summary: {files_done}/{len(files)} file jobs finished; "
+        f"{pass_count} successful, {fail_count} failed ({timeouts} timed out) "
+        f"in {elapsed:.1f}s ({args.jobs} workers) ==="
+    )
+    print(
+        f"  Reported test outcomes: {tests_passed} passed, {tests_failed} failed, "
+        f"{other_outcomes['errors']} errors, {other_outcomes['skipped']} skipped, "
+        f"{other_outcomes['xfailed']} xfailed, {other_outcomes['xpassed']} xpassed"
+    )
+    if unavailable_summaries:
+        count = len(unavailable_summaries)
+        print(
+            f"  {count} file{'s' if count != 1 else ''} with unavailable test-outcome summaries; "
+            "their test outcomes are unknown."
+        )
+    if failures or unavailable_summaries:
+        print("  Reported counts do not establish complete test execution for failed or unreported file jobs.")
 
     # Save durations for future --slice runs. Each slice writes its own
     # partial test_durations.json; a CI merge step joins them later.
@@ -828,31 +860,34 @@ def main() -> int:
     if failures:
         print()
         print("=== Failure output ===")
-        for file, output, _summary in failures:
+        for file, _rc, output, _summary in failures:
             print()
             print(f"--- {_format_file(file, repo_root)} ---")
             print(output.rstrip())
         print()
-        # Split: files with actual test failures vs non-zero exit for other reasons
-        test_fail_files = [(f, s) for f, _o, s in failures if s.get("failed", 0) > 0]
-        all_passed_but_nonzero = [(f, s) for f, _o, s in failures
-                                  if s.get("failed", 0) == 0 and s.get("passed", 0) > 0]
-        no_tests_ran = [(f, s) for f, _o, s in failures
-                        if s.get("failed", 0) == 0 and s.get("passed", 0) == 0]
+        # Outcome evidence and process status are different axes: a file can
+        # report passing tests and still error or time out. An absent summary
+        # says nothing about whether individual tests ran before termination.
+        test_fail_files = [(f, s) for f, _rc, _o, s in failures if s.get("failed", 0) > 0]
+        error_files = [(f, s) for f, _rc, _o, s in failures if s.get("errors", 0) > 0]
+        other_failures = [(f, rc, s) for f, rc, _o, s in failures
+                          if s.get("failed", 0) == 0 and s.get("errors", 0) == 0]
         if test_fail_files:
             total_tf = sum(s.get("failed", 0) for _, s in test_fail_files)
             print(f"=== {len(test_fail_files)} file{'s' if len(test_fail_files) != 1 else ''} with test failures ({total_tf} test{'s' if total_tf != 1 else ''} failed) ===")
             for file, s in test_fail_files:
                 nf = s.get("failed", 0)
                 print(f"  {_format_file(file, repo_root)}  ({nf} test{'s' if nf != 1 else ''} failed)")
-        if all_passed_but_nonzero:
-            print(f"=== {len(all_passed_but_nonzero)} file{'s' if len(all_passed_but_nonzero) != 1 else ''} where all tests passed but pytest exited non-zero (warnings-as-errors, hook failures, etc.) ===")
-            for file, s in all_passed_but_nonzero:
-                print(f"  {_format_file(file, repo_root)}  ({s.get('passed', 0)} passed)")
-        if no_tests_ran:
-            print(f"=== {len(no_tests_ran)} file{'s' if len(no_tests_ran) != 1 else ''} where no tests ran (collection/import error, timeout before collection, etc.) ===")
-            for file, s in no_tests_ran:
-                print(f"  {_format_file(file, repo_root)}")
+        if error_files:
+            print(f"=== {len(error_files)} file{'s' if len(error_files) != 1 else ''} with reported pytest errors ===")
+            for file, s in error_files:
+                print(f"  {_format_file(file, repo_root)}  ({s['errors']} errors)")
+        if other_failures:
+            print(f"=== {len(other_failures)} file job{'s' if len(other_failures) != 1 else ''} with non-zero exits without reported test failures or pytest errors ===")
+            for file, rc, s in other_failures:
+                status = "timeout" if rc == 124 else f"exit {rc}"
+                evidence = f"{s.get('passed', 0)} reported passed" if s else "test outcomes unknown"
+                print(f"  {_format_file(file, repo_root)}  ({status}; {evidence})")
         return 1
 
     return 0

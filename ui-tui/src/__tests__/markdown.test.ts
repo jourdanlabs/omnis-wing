@@ -2,11 +2,24 @@ import { PassThrough } from 'stream'
 
 import { Box, renderSync } from '@omnis-wing/ink'
 import React from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AUDIO_DIRECTIVE_RE, INLINE_RE, Md, MEDIA_LINE_RE, stripInlineMarkup } from '../components/markdown.js'
 import { stripAnsi } from '../lib/text.js'
 import { DEFAULT_THEME } from '../theme.js'
+import { __resetLinkTitleCache } from '../lib/externalLink.js'
+
+// Rendering a link starts its title effect. These tests cover immediate
+// labels, so keep that external fetch offline while retaining the real hook.
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline rendering fixture')))
+})
+
+afterEach(async () => {
+  await Promise.resolve()
+  __resetLinkTitleCache()
+  vi.unstubAllGlobals()
+})
 
 const matches = (text: string) => [...text.matchAll(INLINE_RE)].map(m => m[0])
 const BEL = String.fromCharCode(7)

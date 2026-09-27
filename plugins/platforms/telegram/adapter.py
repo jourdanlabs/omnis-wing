@@ -2318,8 +2318,27 @@ class TelegramAdapter(BasePlatformAdapter):
                 self.name, text, e,
             )
 
+    async def _cancel_pending_batches(self) -> None:
+        """Drain buffered input timers before releasing the adapter's state."""
+        current_task = asyncio.current_task()
+        tasks = set()
+        for task_map in (
+            self._pending_text_batch_tasks,
+            self._pending_photo_batch_tasks,
+            self._media_group_tasks,
+        ):
+            tasks.update(task for task in task_map.values() if task is not current_task)
+            task_map.clear()
+        self._pending_text_batches.clear()
+        self._pending_photo_batches.clear()
+        self._media_group_events.clear()
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     async def disconnect(self) -> None:
-        """Stop polling/webhook, cancel pending album flushes, and disconnect."""
+        """Stop polling/webhook, drain buffered input, and disconnect."""
         # Mark the bot "Offline" in its short description while the bot's HTTP
         # client is still alive (before app shutdown closes it). Opt-in via
         # extra.status_indicator. Non-fatal. This is the clean-shutdown path;
@@ -2330,13 +2349,7 @@ class TelegramAdapter(BasePlatformAdapter):
         except Exception:
             pass
 
-        pending_media_group_tasks = list(self._media_group_tasks.values())
-        for task in pending_media_group_tasks:
-            task.cancel()
-        if pending_media_group_tasks:
-            await asyncio.gather(*pending_media_group_tasks, return_exceptions=True)
-        self._media_group_tasks.clear()
-        self._media_group_events.clear()
+        await self._cancel_pending_batches()
 
         if self._app:
             try:
@@ -2350,11 +2363,9 @@ class TelegramAdapter(BasePlatformAdapter):
                 logger.warning("[%s] Error during Telegram disconnect: %s", self.name, e, exc_info=True)
         self._release_platform_lock()
 
-        for task in self._pending_photo_batch_tasks.values():
-            if task and not task.done():
-                task.cancel()
-        self._pending_photo_batch_tasks.clear()
-        self._pending_photo_batches.clear()
+        # Stopping the updater/application can finish an already queued update,
+        # which may have enqueued another batch while shutdown was awaiting I/O.
+        await self._cancel_pending_batches()
 
         self._mark_disconnected()
         self._app = None
@@ -6470,6 +6481,7 @@ class TelegramAdapter(BasePlatformAdapter):
         )
 
     async def _flush_media_group_event(self, media_group_id: str) -> None:
+        current_task = asyncio.current_task()
         try:
             await asyncio.sleep(self.MEDIA_GROUP_WAIT_SECONDS)
             event = self._media_group_events.pop(media_group_id, None)
@@ -6478,7 +6490,10 @@ class TelegramAdapter(BasePlatformAdapter):
         except asyncio.CancelledError:
             return
         finally:
-            self._media_group_tasks.pop(media_group_id, None)
+            # A newer item can replace this debounce task before cancellation
+            # resumes it. Only the task that still owns the slot may clear it.
+            if self._media_group_tasks.get(media_group_id) is current_task:
+                self._media_group_tasks.pop(media_group_id, None)
 
     async def _handle_sticker(self, msg: Message, event: "MessageEvent") -> None:
         """

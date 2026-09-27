@@ -791,8 +791,9 @@ class TestTelegramPhotoBatching:
 
     @pytest.mark.asyncio
     async def test_disconnect_cancels_pending_photo_batch_tasks(self, adapter):
-        task = MagicMock()
-        task.done.return_value = False
+        # Shutdown now awaits timer completion; use a real cancellable task
+        # rather than a mock that cannot exercise the lifecycle contract.
+        task = asyncio.create_task(asyncio.sleep(60))
         adapter._pending_photo_batch_tasks["session:photo-burst"] = task
         adapter._pending_photo_batches["session:photo-burst"] = MessageEvent(
             text="",
@@ -804,11 +805,15 @@ class TestTelegramPhotoBatching:
         adapter._app.stop = AsyncMock()
         adapter._app.shutdown = AsyncMock()
 
-        await adapter.disconnect()
+        try:
+            await adapter.disconnect()
 
-        task.cancel.assert_called_once()
-        assert adapter._pending_photo_batch_tasks == {}
-        assert adapter._pending_photo_batches == {}
+            assert task.cancelled()
+            assert adapter._pending_photo_batch_tasks == {}
+            assert adapter._pending_photo_batches == {}
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
 
 # ---------------------------------------------------------------------------
